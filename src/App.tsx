@@ -1,121 +1,80 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import "./App.css"
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="container">
 
-      <div className="ticks"></div>
+      <div className="card">
+        <h1>RoomZalazer</h1>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        <div className="subtitle">
+          Smart Meeting Room Reservation System
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+        <div className="info">
+          <span>Current time</span>
+          <span>12:00</span>
+        </div>
+
+        <div className="info">
+          <span>Available now</span>
+          <span>7</span>
+        </div>
+
+        <div className="info">
+          <span>Nearest available room</span>
+          <span>Alpha</span>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Today's Reservations</h2>
+
+        <div className="reservation">
+          <div className="title">
+            Demo Meeting
+          </div>
+
+          <div className="small">
+            Alpha • 10:00 - 11:00
+          </div>
+        </div>
+      </div>
+
+      <div className="room-card">
+
+        <div className="room-head">
+
+          <div className="room-name">
+            Alpha 👥6
+          </div>
+
+          <div className="status available">
+            Available now
+          </div>
+
+        </div>
+
+        <div className="timeline">
+          <div className="t tf"></div>
+          <div className="t tf"></div>
+          <div className="t tr"></div>
+          <div className="t tm"></div>
+          <div className="t ty"></div>
+          <div className="t tym"></div>
+        </div>
+
+        <div className="desc">
+          Free for the rest of the day.
+        </div>
+
+      </div>
+
+      <div className="footer">
+        RoomZalazer • React + TypeScript
+      </div>
+
+    </div>
   )
 }
 
