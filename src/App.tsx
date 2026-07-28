@@ -45,6 +45,10 @@ const [time,setTime]=useState("")
 const [showModal,setShowModal]=
 useState(false)
 
+const [editingReservation,
+setEditingReservation]=
+useState<Reservation|null>(null)
+
 const [title,setTitle]=useState("")
 const [roomId,setRoomId]=useState("")
 const [start,setStart]=useState("09:00")
@@ -90,6 +94,78 @@ new Date().toLocaleTimeString(
 
 }
 
+function openCreate(){
+
+setEditingReservation(null)
+
+setTitle("")
+setRoomId("")
+setStart("09:00")
+setEnd("09:30")
+
+setShowModal(true)
+
+}
+
+function openEdit(
+reservation:Reservation
+){
+
+setEditingReservation(
+reservation
+)
+
+setTitle(
+reservation.title
+)
+
+setRoomId(
+String(
+reservation.room_id
+)
+)
+
+setStart(
+reservation.start_at.slice(
+11,
+16
+)
+)
+
+setEnd(
+reservation.end_at.slice(
+11,
+16
+)
+)
+
+setShowModal(true)
+
+}
+
+async function deleteReservation(
+id:number
+){
+
+if(
+!confirm(
+"Cancel reservation?"
+)
+){
+return
+}
+
+await fetch(
+`${API}/reservations/${id}`,
+{
+method:"DELETE"
+}
+)
+
+await loadData()
+
+}
+
 async function reserveRoom(){
 
 const today=
@@ -117,7 +193,22 @@ end_at:
 
 }
 
-const response=
+if(editingReservation){
+
+await fetch(
+`${API}/reservations/${editingReservation.id}`,
+{
+method:"PUT",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify(body)
+}
+)
+
+}else{
+
 await fetch(
 `${API}/reservations`,
 {
@@ -130,28 +221,11 @@ body:JSON.stringify(body)
 }
 )
 
-const result=
-await response.json()
-
-if(result.ok){
+}
 
 await loadData()
 
 setShowModal(false)
-
-setTitle("")
-setRoomId("")
-setStart("09:00")
-setEnd("09:30")
-
-}else{
-
-alert(
-result.error ??
-"Reservation failed."
-)
-
-}
 
 }
 
@@ -172,52 +246,33 @@ Smart Meeting Room Reservation Platform
 </div>
 
 <div className="info">
-<span>
-Office Time
-</span>
-<span>
-{time}
-</span>
+<span>Office Time</span>
+<span>{time}</span>
 </div>
 
 <div className="info">
-<span>
-Working Hours
-</span>
-<span>
-09:00 - 19:00
-</span>
+<span>Working Hours</span>
+<span>09:00 - 19:00</span>
 </div>
 
 <div className="info">
-<span>
-Total Rooms
-</span>
-<span>
-{rooms.length}
-</span>
+<span>Total Rooms</span>
+<span>{rooms.length}</span>
 </div>
 
 <div className="info">
-<span>
-Total Reservations
-</span>
-<span>
-{reservations.length}
-</span>
+<span>Total Reservations</span>
+<span>{reservations.length}</span>
 </div>
 
 </div>
 
 <ReservationList
-reservations={
-reservations.filter(
-r=>
-r.user_name===
-USER_NAME
-)
-}
+reservations={reservations}
+rooms={rooms}
 userName={USER_NAME}
+onEdit={openEdit}
+onDelete={deleteReservation}
 />
 
 {rooms.map(room=>(
@@ -231,16 +286,14 @@ reservations={reservations}
 ))}
 
 <div className="footer">
-RoomZalazer • Smart Reservation Engine
+RoomZalazer • Edit Enabled
 </div>
 
 </div>
 
 <button
 className="float"
-onClick={()=>
-setShowModal(true)
-}
+onClick={openCreate}
 >
 +
 </button>
@@ -280,4 +333,3 @@ setShowModal(false)
 )
 
 }
-
