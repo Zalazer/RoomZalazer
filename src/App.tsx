@@ -21,6 +21,29 @@ type Reservation = {
 
 const USER_NAME = "Guest"
 
+const TIMES = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+  "17:00",
+  "17:30",
+  "18:00",
+  "18:30",
+]
+
 function App() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
@@ -53,13 +76,53 @@ function App() {
   }
 
   function myReservations() {
-    return reservations
-      .filter((r) => r.user_name === USER_NAME)
-      .sort(
-        (a, b) =>
-          new Date(a.start_at).getTime() -
-          new Date(b.start_at).getTime()
+    return reservations.filter(
+      (r) => r.user_name === USER_NAME
+    )
+  }
+
+  function roomReservations(roomId: number) {
+    return reservations.filter(
+      (r) => r.room_id === roomId
+    )
+  }
+
+  function timelineClass(
+    roomId: number,
+    slot: string
+  ) {
+    const slotMinutes =
+      Number(slot.slice(0, 2)) * 60 +
+      Number(slot.slice(3, 5))
+
+    for (const reservation of roomReservations(
+      roomId
+    )) {
+      const start = new Date(
+        reservation.start_at
       )
+
+      const end = new Date(
+        reservation.end_at
+      )
+
+      const startMinutes =
+        start.getHours() * 60 +
+        start.getMinutes()
+
+      const endMinutes =
+        end.getHours() * 60 +
+        end.getMinutes()
+
+      if (
+        slotMinutes >= startMinutes &&
+        slotMinutes < endMinutes
+      ) {
+        return "tr"
+      }
+    }
+
+    return "tf"
   }
 
   return (
@@ -134,14 +197,32 @@ function App() {
             </div>
           </div>
 
+          <div className="timeline">
+            {TIMES.map((slot) => (
+              <div
+                key={slot}
+                className={`t ${timelineClass(
+                  room.id,
+                  slot
+                )}`}
+              />
+            ))}
+          </div>
+
           <div className="desc">
             {room.description}
+          </div>
+
+          <div className="small">
+            Reservations:
+            {" "}
+            {roomReservations(room.id).length}
           </div>
         </div>
       ))}
 
       <div className="footer">
-        RoomZalazer • Today's Reservations Enabled
+        RoomZalazer • Timeline Enabled
       </div>
     </div>
   )
