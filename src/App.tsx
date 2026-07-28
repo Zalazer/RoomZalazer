@@ -1,310 +1,221 @@
 import { useEffect, useState } from "react"
+
 import "./App.css"
 
-type Room={
-id:number
-name:string
-capacity:number
-description:string
-}
+import HeaderCard from "./components/HeaderCard"
+import ReservationList from "./components/ReservationList"
+import RoomCard from "./components/RoomCard"
+import ReservationModal from "./components/ReservationModal"
 
 const API="https://meeting.shooleeyack.workers.dev"
 
+export type Room={
+  id:number
+  name:string
+  capacity:number
+  description:string
+}
+
+export type Reservation={
+  id:number
+  room_id:number
+  title:string
+  user_name:string
+  start_at:string
+  end_at:string
+}
+
+const USER_NAME="Guest"
+
 function App(){
 
-const [rooms,setRooms]=useState<Room[]>([])
-const [time,setTime]=useState("")
-const [showModal,setShowModal]=useState(false)
+  const [rooms,setRooms]=useState<Room[]>([])
+  const [reservations,setReservations]=useState<Reservation[]>([])
 
-const [title,setTitle]=useState("")
-const [roomId,setRoomId]=useState("")
-const [start,setStart]=useState("09:00")
-const [end,setEnd]=useState("09:30")
+  const [time,setTime]=useState("")
 
-useEffect(()=>{
+  const [showModal,setShowModal]=useState(false)
 
-loadRooms()
+  const [title,setTitle]=useState("")
+  const [roomId,setRoomId]=useState("")
+  const [start,setStart]=useState("09:00")
+  const [end,setEnd]=useState("09:30")
 
-updateClock()
+  useEffect(()=>{
 
-const timer=setInterval(
-updateClock,
-1000
-)
+    loadData()
 
-return()=>clearInterval(timer)
+    updateClock()
 
-},[])
+    const timer=setInterval(
+      updateClock,
+      1000
+    )
 
-async function loadRooms(){
+    return()=>clearInterval(timer)
 
-const response=
-await fetch(`${API}/rooms`)
+  },[])
 
-setRooms(await response.json())
+  async function loadData(){
 
-}
+    const r1=
+      await fetch(`${API}/rooms`)
 
-function updateClock(){
+    const r2=
+      await fetch(`${API}/reservations`)
 
-setTime(
-new Date().toLocaleTimeString(
-"en-GB"
-)
-)
+    setRooms(await r1.json())
+    setReservations(await r2.json())
 
-}
+  }
 
-async function reserveRoom(){
+  function updateClock(){
 
-const today=
-new Date()
-.toISOString()
-.slice(0,10)
+    setTime(
+      new Date()
+        .toLocaleTimeString("en-GB")
+    )
 
-const body={
+  }
 
-room_id:Number(roomId),
+  async function reserveRoom(){
 
-user_id:"guest-user",
+    const today=
+      new Date()
+      .toISOString()
+      .slice(0,10)
 
-user_name:"Guest",
+    const body={
 
-title,
+      room_id:Number(roomId),
 
-description:"",
+      user_id:"guest-user",
 
-start_at:`${today}T${start}:00`,
+      user_name:USER_NAME,
 
-end_at:`${today}T${end}:00`
+      title,
 
-}
+      description:"",
 
-const response=
-await fetch(
-`${API}/reservations`,
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify(body)
-}
-)
+      start_at:
+        `${today}T${start}:00`,
 
-const result=
-await response.json()
+      end_at:
+        `${today}T${end}:00`
 
-if(result.ok){
+    }
 
-alert(
-"Reservation created!"
-)
+    const response=
+      await fetch(
+        `${API}/reservations`,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":
+            "application/json"
+          },
+          body:JSON.stringify(body)
+        }
+      )
 
-setShowModal(false)
+    const result=
+      await response.json()
 
-setTitle("")
+    if(result.ok){
 
-}else{
+      await loadData()
 
-alert(
-result.error ??
-"Unknown error"
-)
+      setShowModal(false)
 
-}
+      setTitle("")
 
-}
+      alert(
+        "Reservation created!"
+      )
 
-return(
-<>
+    }else{
 
-<div className="container">
+      alert(
+        result.error ??
+        "Unknown error"
+      )
 
-<div className="card">
+    }
 
-<h1>
-RoomZalazer
-</h1>
+  }
 
-<div className="subtitle">
-Smart Meeting Room
-Reservation Platform
-</div>
+  return(
+    <>
 
-<div className="info">
-<span>Office Time</span>
-<span>{time}</span>
-</div>
+      <div className="container">
 
-<div className="info">
-<span>Working Hours</span>
-<span>09:00 - 19:00</span>
-</div>
+        <HeaderCard
+          time={time}
+          rooms={rooms.length}
+          reservations={
+            reservations.length
+          }
+        />
 
-<div className="info">
-<span>Total Rooms</span>
-<span>{rooms.length}</span>
-</div>
+        <ReservationList
+          reservations={reservations}
+        />
 
-</div>
+        {rooms.map(room=>(
 
-{rooms.map(room=>(
+          <RoomCard
+            key={room.id}
+            room={room}
+            reservations={
+              reservations
+            }
+          />
 
-<div
-key={room.id}
-className="room-card"
->
+        ))}
 
-<div className="room-head">
+        <div className="footer">
+          RoomZalazer • Component Architecture
+        </div>
 
-<div className="room-name">
-{room.name}
-{" "}
-👥{room.capacity}
-</div>
+      </div>
 
-<div className="status available">
-Available
-</div>
+      <button
+        className="float"
+        onClick={()=>
+          setShowModal(true)
+        }
+      >
+        +
+      </button>
 
-</div>
+      <ReservationModal
 
-<div className="desc">
-{room.description}
-</div>
-
-</div>
+        show={showModal}
 
-))}
+        rooms={rooms}
 
-<div className="footer">
-RoomZalazer • Step 11
-</div>
-
-</div>
-
-<button
-className="float"
-onClick={()=>
-setShowModal(true)
-}
->
-+
-</button>
-
-{showModal&&(
-
-<div className="modal">
-
-<div className="modal-content">
-
-<h2>
-Reserve Meeting Room
-</h2>
+        title={title}
+        setTitle={setTitle}
 
-<label>
-Meeting title
-</label>
-
-<input
-value={title}
-onChange={(e)=>
-setTitle(
-e.target.value
-)
-}
-/>
-
-<label>
-Room
-</label>
-
-<select
-value={roomId}
-onChange={(e)=>
-setRoomId(
-e.target.value
-)
-}
->
-
-<option value="">
-Select room
-</option>
-
-{rooms.map(room=>(
-
-<option
-key={room.id}
-value={room.id}
->
-{room.name}
-</option>
-
-))}
-
-</select>
-
-<label>
-Start
-</label>
-
-<input
-type="time"
-value={start}
-onChange={(e)=>
-setStart(
-e.target.value
-)
-}
-/>
-
-<label>
-End
-</label>
-
-<input
-type="time"
-value={end}
-onChange={(e)=>
-setEnd(
-e.target.value
-)
-}
-/>
-
-<div className="modal-buttons">
-
-<button
-className="primary"
-onClick={
-reserveRoom
-}
->
-Reserve
-</button>
-
-<button
-className="secondary"
-onClick={()=>
-setShowModal(false)
-}
->
-Close
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-)}
-
-</>
-)
+        roomId={roomId}
+        setRoomId={setRoomId}
+
+        start={start}
+        setStart={setStart}
+
+        end={end}
+        setEnd={setEnd}
+
+        onReserve={reserveRoom}
+
+        onClose={()=>
+          setShowModal(false)
+        }
+
+      />
+
+    </>
+  )
 
 }
 
