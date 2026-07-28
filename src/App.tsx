@@ -3,6 +3,13 @@ import "./App.css"
 
 const API = "https://meeting.shooleeyack.workers.dev"
 
+type Room = {
+  id: number
+  name: string
+  capacity: number
+  description: string
+}
+
 type Reservation = {
   id: number
   room_id: number
@@ -12,73 +19,47 @@ type Reservation = {
   end_at: string
 }
 
-type Room = {
-  id: number
-  name: string
-  capacity: number
-  description: string
-}
+const USER_NAME = "Guest"
 
 function App() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
-  const [currentTime, setCurrentTime] = useState("")
+  const [time, setTime] = useState("")
 
   useEffect(() => {
     loadData()
 
     updateClock()
 
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       updateClock()
     }, 1000)
 
-    return () => clearInterval(interval)
+    return () => clearInterval(timer)
   }, [])
 
   async function loadData() {
-    const roomResponse = await fetch(`${API}/rooms`)
-    const reservationResponse = await fetch(`${API}/reservations`)
+    const r1 = await fetch(`${API}/rooms`)
+    const r2 = await fetch(`${API}/reservations`)
 
-    setRooms(await roomResponse.json())
-    setReservations(await reservationResponse.json())
+    setRooms(await r1.json())
+    setReservations(await r2.json())
   }
 
   function updateClock() {
-    setCurrentTime(
-      new Date().toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
+    setTime(
+      new Date().toLocaleTimeString("en-GB")
     )
   }
 
-  function roomReservations(roomId: number) {
-    return reservations.filter((r) => r.room_id === roomId)
-  }
-
-  function roomStatus(roomId: number) {
-    const now = new Date()
-
-    const active = roomReservations(roomId).find((r) => {
-      const start = new Date(r.start_at)
-      const end = new Date(r.end_at)
-
-      return now >= start && now <= end
-    })
-
-    if (active) {
-      return {
-        text: "Meeting Now",
-        color: "#ffb347",
-      }
-    }
-
-    return {
-      text: "Available",
-      color: "#37d76d",
-    }
+  function myReservations() {
+    return reservations
+      .filter((r) => r.user_name === USER_NAME)
+      .sort(
+        (a, b) =>
+          new Date(a.start_at).getTime() -
+          new Date(b.start_at).getTime()
+      )
   }
 
   return (
@@ -92,12 +73,12 @@ function App() {
 
         <div className="info">
           <span>Office Time</span>
-          <span>{currentTime}</span>
+          <span>{time}</span>
         </div>
 
         <div className="info">
           <span>Working Hours</span>
-          <span>08:00 - 20:00</span>
+          <span>09:00 - 19:00</span>
         </div>
 
         <div className="info">
@@ -111,46 +92,56 @@ function App() {
         </div>
       </div>
 
-      {rooms.map((room) => {
-        const status = roomStatus(room.id)
+      <div className="card">
+        <h2>Today's Reservations</h2>
 
-        return (
-          <div className="room-card" key={room.id}>
-            <div className="room-head">
-              <div className="room-name">
-                {room.name}
+        {myReservations().length === 0 ? (
+          <div className="small">
+            No reservations today.
+          </div>
+        ) : (
+          myReservations().map((reservation) => (
+            <div
+              key={reservation.id}
+              className="reservation"
+            >
+              <div className="title">
+                {reservation.title}
               </div>
 
-              <div
-                className="status"
-                style={{
-                  background: status.color,
-                  color: "#000",
-                }}
-              >
-                {status.text}
+              <div className="small">
+                {reservation.start_at.slice(11, 16)}
+                {" - "}
+                {reservation.end_at.slice(11, 16)}
               </div>
             </div>
+          ))
+        )}
+      </div>
 
-            <div className="desc">
-              {room.description}
+      {rooms.map((room) => (
+        <div
+          className="room-card"
+          key={room.id}
+        >
+          <div className="room-head">
+            <div className="room-name">
+              {room.name} 👥{room.capacity}
             </div>
 
-            <div className="small">
-              Capacity: {room.capacity}
-            </div>
-
-            <div className="small">
-              Reservations:
-              {" "}
-              {roomReservations(room.id).length}
+            <div className="status available">
+              Available
             </div>
           </div>
-        )
-      })}
+
+          <div className="desc">
+            {room.description}
+          </div>
+        </div>
+      ))}
 
       <div className="footer">
-        RoomZalazer • Live Reservations Enabled
+        RoomZalazer • Today's Reservations Enabled
       </div>
     </div>
   )
