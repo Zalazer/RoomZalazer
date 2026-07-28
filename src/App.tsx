@@ -168,8 +168,7 @@ RoomZalazer
 </h1>
 
 <div className="subtitle">
-Smart Meeting Room
-Reservation Platform
+Smart Meeting Room Reservation Platform
 </div>
 
 <div className="info">
@@ -232,7 +231,7 @@ reservations={reservations}
 ))}
 
 <div className="footer">
-RoomZalazer • Smart Modal
+RoomZalazer • Smart Reservation Engine
 </div>
 
 </div>
@@ -253,6 +252,8 @@ show={showModal}
 rooms={rooms}
 
 times={TIMES}
+
+reservations={reservations}
 
 title={title}
 setTitle={setTitle}
@@ -279,3 +280,4 @@ setShowModal(false)
 )
 
 }
+

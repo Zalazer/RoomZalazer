@@ -5,10 +5,21 @@ id:number
 name:string
 }
 
+type Reservation={
+id:number
+room_id:number
+start_at:string
+end_at:string
+}
+
 type Props={
 show:boolean
+
 rooms:Room[]
+
 times:string[]
+
+reservations:Reservation[]
 
 title:string
 setTitle:(v:string)=>void
@@ -29,8 +40,12 @@ onClose:()=>void
 export default function ReservationModal({
 
 show,
+
 rooms,
+
 times,
+
+reservations,
 
 title,
 setTitle,
@@ -60,6 +75,60 @@ Number(v.slice(3,5))
 
 }
 
+const roomReservations=
+reservations
+.filter(
+r=>r.room_id===Number(roomId)
+)
+.sort(
+(a,b)=>
+a.start_at.localeCompare(
+b.start_at
+)
+)
+
+const availableStartTimes=
+times.filter(t=>{
+
+const m=minutes(t)
+
+for(const r of roomReservations){
+
+const s=minutes(
+r.start_at.slice(11,16)
+)
+
+const e=minutes(
+r.end_at.slice(11,16)
+)
+
+if(
+m>=s &&
+m<e
+){
+
+return false
+
+}
+
+}
+
+return true
+
+})
+
+const nextBusy=
+roomReservations
+.map(
+r=>
+minutes(
+r.start_at.slice(11,16)
+)
+)
+.find(
+m=>m>minutes(start)
+)
+
 const availableEndTimes=
 times.filter(t=>{
 
@@ -67,9 +136,18 @@ const s=minutes(start)
 const e=minutes(t)
 
 return(
+
 e>s &&
+
+e<=s+240 &&
+
 e<=1140 &&
-e<=s+240
+
+(
+nextBusy===undefined ||
+e<=nextBusy
+)
+
 )
 
 })
@@ -77,8 +155,27 @@ e<=s+240
 useEffect(()=>{
 
 if(
+availableStartTimes.length &&
+!availableStartTimes.includes(
+start
+)
+){
+
+setStart(
+availableStartTimes[0]
+)
+
+}
+
+},[roomId])
+
+useEffect(()=>{
+
+if(
 availableEndTimes.length &&
-!availableEndTimes.includes(end)
+!availableEndTimes.includes(
+end
+)
 ){
 
 setEnd(
@@ -87,7 +184,7 @@ availableEndTimes[0]
 
 }
 
-},[start])
+},[start,roomId])
 
 return(
 
@@ -106,7 +203,9 @@ Meeting title
 <input
 value={title}
 onChange={(e)=>
-setTitle(e.target.value)
+setTitle(
+e.target.value
+)
 }
 />
 
@@ -117,7 +216,9 @@ Room
 <select
 value={roomId}
 onChange={(e)=>
-setRoomId(e.target.value)
+setRoomId(
+e.target.value
+)
 }
 >
 
@@ -145,11 +246,13 @@ Start time
 <select
 value={start}
 onChange={(e)=>
-setStart(e.target.value)
+setStart(
+e.target.value
+)
 }
 >
 
-{times.map(t=>(
+{availableStartTimes.map(t=>(
 
 <option
 key={t}
@@ -169,7 +272,9 @@ End time
 <select
 value={end}
 onChange={(e)=>
-setEnd(e.target.value)
+setEnd(
+e.target.value
+)
 }
 >
 
