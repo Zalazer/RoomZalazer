@@ -10,10 +10,31 @@ type Room = {
 
 function App() {
   const [rooms, setRooms] = useState<Room[]>([])
+  const [currentTime, setCurrentTime] = useState("")
 
   useEffect(() => {
     loadRooms()
+
+    updateClock()
+
+    const interval = setInterval(() => {
+      updateClock()
+    }, 1000)
+
+    return () => clearInterval(interval)
   }, [])
+
+  function updateClock() {
+    const now = new Date()
+
+    const time = now.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+
+    setCurrentTime(time)
+  }
 
   function loadRooms() {
     setRooms([
@@ -37,7 +58,7 @@ function App() {
 
         <div className="info">
           <span>Office Time</span>
-          <span>Europe/Kyiv</span>
+          <span>{currentTime}</span>
         </div>
 
         <div className="info">
