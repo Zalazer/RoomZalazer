@@ -1,15 +1,31 @@
+import { useEffect, useState } from "react"
 import "./App.css"
 
-const rooms = [
-  { name: "Alpha", floor: 1, capacity: 6, status: "available" },
-  { name: "Bravo", floor: 1, capacity: 8, status: "reserved" },
-  { name: "Charlie", floor: 2, capacity: 4, status: "meeting" },
-  { name: "Delta", floor: 2, capacity: 10, status: "available" },
-  { name: "Echo", floor: 3, capacity: 12, status: "available" },
-  { name: "Foxtrot", floor: 3, capacity: 16, status: "available" },
-]
+type Room = {
+  name: string
+  floor: number
+  capacity: number
+  status: string
+}
 
 function App() {
+  const [rooms, setRooms] = useState<Room[]>([])
+
+  useEffect(() => {
+    loadRooms()
+  }, [])
+
+  function loadRooms() {
+    setRooms([
+      { name: "Alpha", floor: 1, capacity: 6, status: "available" },
+      { name: "Bravo", floor: 1, capacity: 8, status: "reserved" },
+      { name: "Charlie", floor: 2, capacity: 4, status: "meeting" },
+      { name: "Delta", floor: 2, capacity: 10, status: "available" },
+      { name: "Echo", floor: 3, capacity: 12, status: "available" },
+      { name: "Foxtrot", floor: 3, capacity: 16, status: "available" },
+    ])
+  }
+
   return (
     <div className="container">
       <div className="card">
