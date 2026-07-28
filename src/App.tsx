@@ -19,18 +19,14 @@ function App() {
 
     updateClock()
 
-    const interval = setInterval(() => {
-      updateClock()
-    }, 1000)
+    const interval = setInterval(updateClock, 1000)
 
     return () => clearInterval(interval)
   }, [])
 
   function updateClock() {
-    const now = new Date()
-
     setCurrentTime(
-      now.toLocaleTimeString("en-GB", {
+      new Date().toLocaleTimeString("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
@@ -41,13 +37,22 @@ function App() {
   async function loadRooms() {
     try {
       const response = await fetch(`${API}/rooms`)
-
       const data = await response.json()
 
       setRooms(data)
-    } catch (error) {
-      console.error(error)
+    } catch (e) {
+      console.error(e)
     }
+  }
+
+  function getCapacityColor(capacity: number) {
+    if (capacity <= 4) return "#52a5ff"
+
+    if (capacity <= 8) return "#37d76d"
+
+    if (capacity <= 12) return "#ffb347"
+
+    return "#ff5757"
   }
 
   return (
@@ -74,11 +79,17 @@ function App() {
         <div className="room-card" key={room.id}>
           <div className="room-head">
             <div className="room-name">
-              {room.name} 👥{room.capacity}
+              {room.name}
             </div>
 
-            <div className="status available">
-              Available
+            <div
+              className="status available"
+              style={{
+                background: getCapacityColor(room.capacity),
+                color: "#000",
+              }}
+            >
+              👥 {room.capacity}
             </div>
           </div>
 
