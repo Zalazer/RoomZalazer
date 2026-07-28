@@ -1,7 +1,9 @@
 import {useEffect,useState} from "react"
 import "./App.css"
+
 import RoomCard from "./components/RoomCard"
 import ReservationList from "./components/ReservationList"
+import ReservationModal from "./components/ReservationModal"
 
 const API="https://meeting.shooleeyack.workers.dev"
 
@@ -10,7 +12,8 @@ const TIMES=[
 "11:00","11:30","12:00","12:30",
 "13:00","13:30","14:00","14:30",
 "15:00","15:30","16:00","16:30",
-"17:00","17:30","18:00","18:30"
+"17:00","17:30","18:00","18:30",
+"19:00"
 ]
 
 const USER_NAME="Guest"
@@ -34,16 +37,18 @@ end_at:string
 export default function App(){
 
 const [rooms,setRooms]=useState<Room[]>([])
-const [reservations,setReservations]=useState<Reservation[]>([])
+const [reservations,setReservations]=
+useState<Reservation[]>([])
+
 const [time,setTime]=useState("")
 
-const [showModal,setShowModal]=useState(false)
+const [showModal,setShowModal]=
+useState(false)
 
 const [title,setTitle]=useState("")
 const [roomId,setRoomId]=useState("")
 const [start,setStart]=useState("09:00")
 const [end,setEnd]=useState("09:30")
-const [error,setError]=useState("")
 
 useEffect(()=>{
 
@@ -62,8 +67,13 @@ return()=>clearInterval(timer)
 
 async function loadData(){
 
-const r1=await fetch(`${API}/rooms`)
-const r2=await fetch(`${API}/reservations`)
+const r1=
+await fetch(`${API}/rooms`)
+
+const r2=
+await fetch(
+`${API}/reservations`
+)
 
 setRooms(await r1.json())
 setReservations(await r2.json())
@@ -80,41 +90,7 @@ new Date().toLocaleTimeString(
 
 }
 
-function minutes(v:string){
-
-return(
-Number(v.slice(0,2))*60+
-Number(v.slice(3,5))
-)
-
-}
-
 async function reserveRoom(){
-
-setError("")
-
-const s=minutes(start)
-const e=minutes(end)
-
-if(e<=s){
-
-setError(
-"End time must be later than start time."
-)
-
-return
-
-}
-
-if(e-s>240){
-
-setError(
-"Maximum reservation duration is 4 hours."
-)
-
-return
-
-}
 
 const today=
 new Date()
@@ -124,12 +100,20 @@ new Date()
 const body={
 
 room_id:Number(roomId),
+
 user_id:"guest",
+
 user_name:USER_NAME,
+
 title,
+
 description:"",
-start_at:`${today}T${start}:00`,
-end_at:`${today}T${end}:00`
+
+start_at:
+`${today}T${start}:00`,
+
+end_at:
+`${today}T${end}:00`
 
 }
 
@@ -139,7 +123,8 @@ await fetch(
 {
 method:"POST",
 headers:{
-"Content-Type":"application/json"
+"Content-Type":
+"application/json"
 },
 body:JSON.stringify(body)
 }
@@ -161,7 +146,7 @@ setEnd("09:30")
 
 }else{
 
-setError(
+alert(
 result.error ??
 "Reservation failed."
 )
@@ -171,36 +156,56 @@ result.error ??
 }
 
 return(
+
 <>
 
 <div className="container">
 
 <div className="card">
 
-<h1>RoomZalazer</h1>
+<h1>
+RoomZalazer
+</h1>
 
 <div className="subtitle">
-Smart Meeting Room Reservation Platform
+Smart Meeting Room
+Reservation Platform
 </div>
 
 <div className="info">
-<span>Office Time</span>
-<span>{time}</span>
+<span>
+Office Time
+</span>
+<span>
+{time}
+</span>
 </div>
 
 <div className="info">
-<span>Working Hours</span>
-<span>09:00 - 19:00</span>
+<span>
+Working Hours
+</span>
+<span>
+09:00 - 19:00
+</span>
 </div>
 
 <div className="info">
-<span>Total Rooms</span>
-<span>{rooms.length}</span>
+<span>
+Total Rooms
+</span>
+<span>
+{rooms.length}
+</span>
 </div>
 
 <div className="info">
-<span>Total Reservations</span>
-<span>{reservations.length}</span>
+<span>
+Total Reservations
+</span>
+<span>
+{reservations.length}
+</span>
 </div>
 
 </div>
@@ -208,7 +213,9 @@ Smart Meeting Room Reservation Platform
 <ReservationList
 reservations={
 reservations.filter(
-r=>r.user_name===USER_NAME
+r=>
+r.user_name===
+USER_NAME
 )
 }
 userName={USER_NAME}
@@ -225,7 +232,7 @@ reservations={reservations}
 ))}
 
 <div className="footer">
-RoomZalazer • Tournament Build
+RoomZalazer • Smart Modal
 </div>
 
 </div>
@@ -239,146 +246,36 @@ setShowModal(true)
 +
 </button>
 
-{showModal&&(
+<ReservationModal
 
-<div className="modal">
+show={showModal}
 
-<div className="modal-content">
+rooms={rooms}
 
-<h2>
-Reserve Meeting Room
-</h2>
+times={TIMES}
 
-<label>
-Meeting title
-</label>
+title={title}
+setTitle={setTitle}
 
-<input
-value={title}
-onChange={(e)=>
-setTitle(
-e.target.value
-)
-}
-/>
+roomId={roomId}
+setRoomId={setRoomId}
 
-<label>
-Room
-</label>
+start={start}
+setStart={setStart}
 
-<select
-value={roomId}
-onChange={(e)=>
-setRoomId(
-e.target.value
-)
-}
->
+end={end}
+setEnd={setEnd}
 
-<option value="">
-Select room
-</option>
+onReserve={reserveRoom}
 
-{rooms.map(room=>(
-
-<option
-key={room.id}
-value={room.id}
->
-{room.name}
-</option>
-
-))}
-
-</select>
-
-<label>
-Start time
-</label>
-
-<select
-value={start}
-onChange={(e)=>
-setStart(
-e.target.value
-)
-}
->
-
-{TIMES.map(t=>(
-
-<option
-key={t}
-value={t}
->
-{t}
-</option>
-
-))}
-
-</select>
-
-<label>
-End time
-</label>
-
-<select
-value={end}
-onChange={(e)=>
-setEnd(
-e.target.value
-)
-}
->
-
-{TIMES.map(t=>(
-
-<option
-key={t}
-value={t}
->
-{t}
-</option>
-
-))}
-
-</select>
-
-{error&&(
-<div className="box">
-{error}
-</div>
-)}
-
-<div className="modal-buttons">
-
-<button
-className="primary"
-onClick={
-reserveRoom
-}
->
-Reserve
-</button>
-
-<button
-className="secondary"
-onClick={()=>
+onClose={()=>
 setShowModal(false)
 }
->
-Close
-</button>
 
-</div>
-
-</div>
-
-</div>
-
-)}
+/>
 
 </>
+
 )
 
 }
