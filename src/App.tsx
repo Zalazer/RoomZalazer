@@ -1,237 +1,311 @@
 import { useEffect, useState } from "react"
 import "./App.css"
 
-const API = "https://meeting.shooleeyack.workers.dev"
-
-type Room = {
-  id: number
-  name: string
-  capacity: number
-  description: string
+type Room={
+id:number
+name:string
+capacity:number
+description:string
 }
 
-type Reservation = {
-  id: number
-  room_id: number
-  title: string
-  user_name: string
-  start_at: string
-  end_at: string
+const API="https://meeting.shooleeyack.workers.dev"
+
+function App(){
+
+const [rooms,setRooms]=useState<Room[]>([])
+const [time,setTime]=useState("")
+const [showModal,setShowModal]=useState(false)
+
+const [title,setTitle]=useState("")
+const [roomId,setRoomId]=useState("")
+const [start,setStart]=useState("09:00")
+const [end,setEnd]=useState("09:30")
+
+useEffect(()=>{
+
+loadRooms()
+
+updateClock()
+
+const timer=setInterval(
+updateClock,
+1000
+)
+
+return()=>clearInterval(timer)
+
+},[])
+
+async function loadRooms(){
+
+const response=
+await fetch(`${API}/rooms`)
+
+setRooms(await response.json())
+
 }
 
-const USER_NAME = "Guest"
+function updateClock(){
 
-const TIMES = [
-  "09:00","09:30","10:00","10:30",
-  "11:00","11:30","12:00","12:30",
-  "13:00","13:30","14:00","14:30",
-  "15:00","15:30","16:00","16:30",
-  "17:00","17:30","18:00","18:30",
-]
+setTime(
+new Date().toLocaleTimeString(
+"en-GB"
+)
+)
 
-function App() {
-  const [rooms, setRooms] = useState<Room[]>([])
-  const [reservations, setReservations] =
-    useState<Reservation[]>([])
+}
 
-  const [time, setTime] = useState("")
-  const [showModal, setShowModal] =
-    useState(false)
+async function reserveRoom(){
 
-  useEffect(() => {
-    loadData()
+const today=
+new Date()
+.toISOString()
+.slice(0,10)
 
-    updateClock()
+const body={
 
-    const timer = setInterval(
-      updateClock,
-      1000
-    )
+room_id:Number(roomId),
 
-    return () => clearInterval(timer)
-  }, [])
+user_id:"guest-user",
 
-  async function loadData() {
-    const r1 = await fetch(`${API}/rooms`)
-    const r2 = await fetch(
-      `${API}/reservations`
-    )
+user_name:"Guest",
 
-    setRooms(await r1.json())
-    setReservations(await r2.json())
-  }
+title,
 
-  function updateClock() {
-    setTime(
-      new Date().toLocaleTimeString(
-        "en-GB"
-      )
-    )
-  }
+description:"",
 
-  function roomReservations(id: number) {
-    return reservations.filter(
-      (r) => r.room_id === id
-    )
-  }
+start_at:`${today}T${start}:00`,
 
-  function timelineClass(
-    roomId: number,
-    slot: string
-  ) {
-    const slotMinutes =
-      Number(slot.slice(0, 2)) * 60 +
-      Number(slot.slice(3, 5))
+end_at:`${today}T${end}:00`
 
-    for (const reservation of roomReservations(
-      roomId
-    )) {
-      const start = new Date(
-        reservation.start_at
-      )
+}
 
-      const end = new Date(
-        reservation.end_at
-      )
+const response=
+await fetch(
+`${API}/reservations`,
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify(body)
+}
+)
 
-      const s =
-        start.getHours() * 60 +
-        start.getMinutes()
+const result=
+await response.json()
 
-      const e =
-        end.getHours() * 60 +
-        end.getMinutes()
+if(result.ok){
 
-      if (
-        slotMinutes >= s &&
-        slotMinutes < e
-      ) {
-        return "tr"
-      }
-    }
+alert(
+"Reservation created!"
+)
 
-    return "tf"
-  }
+setShowModal(false)
 
-  return (
-    <>
-      <div className="container">
+setTitle("")
 
-        <div className="card">
-          <h1>RoomZalazer</h1>
+}else{
 
-          <div className="subtitle">
-            Smart Meeting Room
-            Reservation Platform
-          </div>
+alert(
+result.error ??
+"Unknown error"
+)
 
-          <div className="info">
-            <span>Office Time</span>
-            <span>{time}</span>
-          </div>
+}
 
-          <div className="info">
-            <span>Working Hours</span>
-            <span>09:00 - 19:00</span>
-          </div>
+}
 
-          <div className="info">
-            <span>Total Rooms</span>
-            <span>{rooms.length}</span>
-          </div>
+return(
+<>
 
-          <div className="info">
-            <span>Total Reservations</span>
-            <span>
-              {reservations.length}
-            </span>
-          </div>
-        </div>
+<div className="container">
 
-        <div className="card">
-          <h2>Today's Reservations</h2>
+<div className="card">
 
-          <div className="small">
-            No reservations today.
-          </div>
-        </div>
+<h1>
+RoomZalazer
+</h1>
 
-        {rooms.map((room) => (
-          <div
-            key={room.id}
-            className="room-card"
-          >
-            <div className="room-head">
-              <div className="room-name">
-                {room.name}
-                {" "}
-                👥{room.capacity}
-              </div>
+<div className="subtitle">
+Smart Meeting Room
+Reservation Platform
+</div>
 
-              <div className="status available">
-                Available
-              </div>
-            </div>
+<div className="info">
+<span>Office Time</span>
+<span>{time}</span>
+</div>
 
-            <div className="timeline">
-              {TIMES.map((slot) => (
-                <div
-                  key={slot}
-                  className={`t ${timelineClass(
-                    room.id,
-                    slot
-                  )}`}
-                />
-              ))}
-            </div>
+<div className="info">
+<span>Working Hours</span>
+<span>09:00 - 19:00</span>
+</div>
 
-            <div className="desc">
-              {room.description}
-            </div>
-          </div>
-        ))}
+<div className="info">
+<span>Total Rooms</span>
+<span>{rooms.length}</span>
+</div>
 
-        <div className="footer">
-          RoomZalazer • Step 10
-        </div>
-      </div>
+</div>
 
-      <button
-        className="float"
-        onClick={() =>
-          setShowModal(true)
-        }
-      >
-        +
-      </button>
+{rooms.map(room=>(
 
-      {showModal && (
-        <div className="modal">
-          <div className="modal-content">
-            <h2>
-              Reserve Meeting Room
-            </h2>
+<div
+key={room.id}
+className="room-card"
+>
 
-            <div className="small">
-              Reservation form will
-              be added on Step 11.
-            </div>
+<div className="room-head">
 
-            <div className="modal-buttons">
-              <button
-                className="secondary"
-                onClick={() =>
-                  setShowModal(false)
-                }
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
+<div className="room-name">
+{room.name}
+{" "}
+👥{room.capacity}
+</div>
+
+<div className="status available">
+Available
+</div>
+
+</div>
+
+<div className="desc">
+{room.description}
+</div>
+
+</div>
+
+))}
+
+<div className="footer">
+RoomZalazer • Step 11
+</div>
+
+</div>
+
+<button
+className="float"
+onClick={()=>
+setShowModal(true)
+}
+>
++
+</button>
+
+{showModal&&(
+
+<div className="modal">
+
+<div className="modal-content">
+
+<h2>
+Reserve Meeting Room
+</h2>
+
+<label>
+Meeting title
+</label>
+
+<input
+value={title}
+onChange={(e)=>
+setTitle(
+e.target.value
+)
+}
+/>
+
+<label>
+Room
+</label>
+
+<select
+value={roomId}
+onChange={(e)=>
+setRoomId(
+e.target.value
+)
+}
+>
+
+<option value="">
+Select room
+</option>
+
+{rooms.map(room=>(
+
+<option
+key={room.id}
+value={room.id}
+>
+{room.name}
+</option>
+
+))}
+
+</select>
+
+<label>
+Start
+</label>
+
+<input
+type="time"
+value={start}
+onChange={(e)=>
+setStart(
+e.target.value
+)
+}
+/>
+
+<label>
+End
+</label>
+
+<input
+type="time"
+value={end}
+onChange={(e)=>
+setEnd(
+e.target.value
+)
+}
+/>
+
+<div className="modal-buttons">
+
+<button
+className="primary"
+onClick={
+reserveRoom
+}
+>
+Reserve
+</button>
+
+<button
+className="secondary"
+onClick={()=>
+setShowModal(false)
+}
+>
+Close
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+)}
+
+</>
+)
+
 }
 
 export default App
