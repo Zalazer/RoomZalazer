@@ -3,6 +3,15 @@ import "./App.css"
 
 const API = "https://meeting.shooleeyack.workers.dev"
 
+type Reservation = {
+  id: number
+  room_id: number
+  title: string
+  user_name: string
+  start_at: string
+  end_at: string
+}
+
 type Room = {
   id: number
   name: string
@@ -12,17 +21,28 @@ type Room = {
 
 function App() {
   const [rooms, setRooms] = useState<Room[]>([])
+  const [reservations, setReservations] = useState<Reservation[]>([])
   const [currentTime, setCurrentTime] = useState("")
 
   useEffect(() => {
-    loadRooms()
+    loadData()
 
     updateClock()
 
-    const interval = setInterval(updateClock, 1000)
+    const interval = setInterval(() => {
+      updateClock()
+    }, 1000)
 
     return () => clearInterval(interval)
   }, [])
+
+  async function loadData() {
+    const roomResponse = await fetch(`${API}/rooms`)
+    const reservationResponse = await fetch(`${API}/reservations`)
+
+    setRooms(await roomResponse.json())
+    setReservations(await reservationResponse.json())
+  }
 
   function updateClock() {
     setCurrentTime(
@@ -34,25 +54,31 @@ function App() {
     )
   }
 
-  async function loadRooms() {
-    try {
-      const response = await fetch(`${API}/rooms`)
-      const data = await response.json()
-
-      setRooms(data)
-    } catch (e) {
-      console.error(e)
-    }
+  function roomReservations(roomId: number) {
+    return reservations.filter((r) => r.room_id === roomId)
   }
 
-  function getCapacityColor(capacity: number) {
-    if (capacity <= 4) return "#52a5ff"
+  function roomStatus(roomId: number) {
+    const now = new Date()
 
-    if (capacity <= 8) return "#37d76d"
+    const active = roomReservations(roomId).find((r) => {
+      const start = new Date(r.start_at)
+      const end = new Date(r.end_at)
 
-    if (capacity <= 12) return "#ffb347"
+      return now >= start && now <= end
+    })
 
-    return "#ff5757"
+    if (active) {
+      return {
+        text: "Meeting Now",
+        color: "#ffb347",
+      }
+    }
+
+    return {
+      text: "Available",
+      color: "#37d76d",
+    }
   }
 
   return (
@@ -70,46 +96,61 @@ function App() {
         </div>
 
         <div className="info">
+          <span>Working Hours</span>
+          <span>08:00 - 20:00</span>
+        </div>
+
+        <div className="info">
           <span>Total Rooms</span>
           <span>{rooms.length}</span>
         </div>
+
+        <div className="info">
+          <span>Total Reservations</span>
+          <span>{reservations.length}</span>
+        </div>
       </div>
 
-      {rooms.map((room) => (
-        <div className="room-card" key={room.id}>
-          <div className="room-head">
-            <div className="room-name">
-              {room.name}
+      {rooms.map((room) => {
+        const status = roomStatus(room.id)
+
+        return (
+          <div className="room-card" key={room.id}>
+            <div className="room-head">
+              <div className="room-name">
+                {room.name}
+              </div>
+
+              <div
+                className="status"
+                style={{
+                  background: status.color,
+                  color: "#000",
+                }}
+              >
+                {status.text}
+              </div>
             </div>
 
-            <div
-              className="status available"
-              style={{
-                background: getCapacityColor(room.capacity),
-                color: "#000",
-              }}
-            >
-              👥 {room.capacity}
+            <div className="desc">
+              {room.description}
+            </div>
+
+            <div className="small">
+              Capacity: {room.capacity}
+            </div>
+
+            <div className="small">
+              Reservations:
+              {" "}
+              {roomReservations(room.id).length}
             </div>
           </div>
-
-          <div className="timeline">
-            <div className="t tf"></div>
-            <div className="t tf"></div>
-            <div className="t tf"></div>
-            <div className="t tf"></div>
-            <div className="t tf"></div>
-            <div className="t tf"></div>
-          </div>
-
-          <div className="desc">
-            {room.description}
-          </div>
-        </div>
-      ))}
+        )
+      })}
 
       <div className="footer">
-        RoomZalazer • Live API Connected
+        RoomZalazer • Live Reservations Enabled
       </div>
     </div>
   )
