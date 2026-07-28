@@ -1,65 +1,63 @@
 import Timeline from "./Timeline"
 
-type Reservation = {
-  id:number
-  room_id:number
-  title:string
-  user_name:string
-  start_at:string
-  end_at:string
+type Reservation={
+ id:number
+ room_id:number
+ title:string
+ user_name?:string
+ start_at:string
+ end_at:string
 }
 
-type Room = {
-  id:number
-  name:string
-  capacity:number
-  description:string
+type Room={
+ id:number
+ name:string
+ capacity:number
+ description:string
 }
 
-type Props = {
-  room:Room
-  reservations:Reservation[]
+type Props={
+ room:Room
+ reservations:Reservation[]
 }
 
 export default function RoomCard({
-  room,
-  reservations
+ room,
+ reservations
 }:Props){
 
-  return(
-    <div className="room-card">
+ const count=reservations.filter(
+  r=>r.room_id===room.id
+ ).length
 
-      <div className="room-head">
+ return(
+  <div className="room-card">
 
-        <div className="room-name">
-          {room.name} 👥{room.capacity}
-        </div>
+   <div className="room-head">
 
-        <div className="status available">
-          Available
-        </div>
-
-      </div>
-
-      <Timeline
-        roomId={room.id}
-        reservations={reservations}
-      />
-
-      <div className="desc">
-        {room.description}
-      </div>
-
-      <div className="small">
-        Reservations:
-        {" "}
-        {
-          reservations.filter(
-            r=>r.room_id===room.id
-          ).length
-        }
-      </div>
-
+    <div className="room-name">
+     {room.name} 👥{room.capacity}
     </div>
-  )
+
+    <div className="status available">
+     {count?"Busy":"Available"}
+    </div>
+
+   </div>
+
+   <Timeline
+    roomId={room.id}
+    reservations={reservations}
+   />
+
+   <div className="desc">
+    {room.description}
+   </div>
+
+   <div className="small">
+    Reservations: {count}
+   </div>
+
+  </div>
+ )
 }

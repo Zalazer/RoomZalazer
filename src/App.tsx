@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react"
 import "./App.css"
 
+import HeaderCard from "./components/HeaderCard"
 import RoomCard from "./components/RoomCard"
 import ReservationList from "./components/ReservationList"
 import ReservationModal from "./components/ReservationModal"
@@ -16,320 +17,348 @@ const TIMES=[
 "19:00"
 ]
 
-const USER_NAME="Guest"
+type User={
+ id:string
+ name:string
+ email:string
+}
 
 type Room={
-id:number
-name:string
-capacity:number
-description:string
+ id:number
+ name:string
+ capacity:number
+ description:string
 }
 
 type Reservation={
-id:number
-room_id:number
-title:string
-user_name:string
-start_at:string
-end_at:string
+ id:number
+ room_id:number
+ title:string
+ start_at:string
+ end_at:string
+ user_name?:string
+ room_name?:string
+ status?:string
 }
 
 export default function App(){
 
-const [rooms,setRooms]=useState<Room[]>([])
-const [reservations,setReservations]=
-useState<Reservation[]>([])
+const[token,setToken]=useState(
+localStorage.getItem("token")||""
+)
 
-const [time,setTime]=useState("")
+const[user,setUser]=useState<User|null>(null)
 
-const [showModal,setShowModal]=
-useState(false)
+const[rooms,setRooms]=useState<Room[]>([])
+const[reservations,setReservations]=useState<Reservation[]>([])
+const[myReservations,setMyReservations]=useState<Reservation[]>([])
 
-const [editingReservation,
-setEditingReservation]=
-useState<Reservation|null>(null)
+const[time,setTime]=useState("")
 
-const [title,setTitle]=useState("")
-const [roomId,setRoomId]=useState("")
-const [start,setStart]=useState("09:00")
-const [end,setEnd]=useState("09:30")
+const[showModal,setShowModal]=useState(false)
+
+const[title,setTitle]=useState("")
+const[roomId,setRoomId]=useState("")
+const[start,setStart]=useState("09:00")
+const[end,setEnd]=useState("09:30")
+
+const[email,setEmail]=useState("")
+const[password,setPassword]=useState("")
+const[registerMode,setRegisterMode]=useState(false)
+const[name,setName]=useState("")
 
 useEffect(()=>{
-
-loadData()
-
-updateClock()
-
-const timer=setInterval(
-updateClock,
-1000
-)
-
-return()=>clearInterval(timer)
-
-},[])
-
-async function loadData(){
-
-const r1=
-await fetch(`${API}/rooms`)
-
-const r2=
-await fetch(
-`${API}/reservations`
-)
-
-setRooms(await r1.json())
-setReservations(await r2.json())
-
-}
+ updateClock()
+ const t=setInterval(updateClock,1000)
+ if(token)loadAll()
+ return()=>clearInterval(t)
+},[token])
 
 function updateClock(){
-
-setTime(
-new Date().toLocaleTimeString(
-"en-GB"
-)
-)
-
+ setTime(new Date().toLocaleTimeString("en-GB"))
 }
 
-function openCreate(){
-
-setEditingReservation(null)
-
-setTitle("")
-setRoomId("")
-setStart("09:00")
-setEnd("09:30")
-
-setShowModal(true)
-
-}
-
-function openEdit(
-reservation:Reservation
+async function api(
+ path:string,
+ options:any={}
 ){
+ const headers:any={
+  ...(options.headers||{})
+ }
 
-setEditingReservation(
-reservation
-)
+ if(token)
+  headers.Authorization=`Bearer ${token}`
 
-setTitle(
-reservation.title
-)
+ const r=await fetch(
+  `${API}${path}`,
+  {...options,headers}
+ )
 
-setRoomId(
-String(
-reservation.room_id
-)
-)
+ return r.json()
+}
 
-setStart(
-reservation.start_at.slice(
-11,
-16
-)
-)
+async function loadAll(){
 
-setEnd(
-reservation.end_at.slice(
-11,
-16
-)
-)
+ const me=await api("/auth/me")
 
-setShowModal(true)
+ if(!me.ok){
+  localStorage.removeItem("token")
+  setToken("")
+  setUser(null)
+  return
+ }
 
+ setUser(me.user)
+
+ const rooms=await api("/rooms")
+ const reservations=await api("/reservations")
+ const mine=await api("/my/reservations")
+
+ setRooms(rooms)
+ setReservations(reservations)
+ setMyReservations(mine.upcoming||[])
+}
+
+async function login(){
+
+ const r=await api(
+  "/auth/login",
+  {
+   method:"POST",
+   headers:{
+    "Content-Type":"application/json"
+   },
+   body:JSON.stringify({
+    email,
+    password
+   })
+  }
+ )
+
+ if(!r.ok){
+  alert(r.error)
+  return
+ }
+
+ localStorage.setItem(
+  "token",
+  r.token
+ )
+
+ setToken(r.token)
+}
+
+async function register(){
+
+ const r=await api(
+  "/auth/register",
+  {
+   method:"POST",
+   headers:{
+    "Content-Type":"application/json"
+   },
+   body:JSON.stringify({
+    name,
+    email,
+    password
+   })
+  }
+ )
+
+ if(!r.ok){
+  alert(r.error)
+  return
+ }
+
+ alert("Registered. Please login.")
+ setRegisterMode(false)
+}
+
+async function logout(){
+ await api(
+  "/auth/logout",
+  {method:"POST"}
+ )
+
+ localStorage.removeItem("token")
+ setToken("")
+ setUser(null)
 }
 
 async function deleteReservation(
-id:number
+ id:number
 ){
+ if(!confirm("Cancel reservation?"))
+  return
 
-if(
-!confirm(
-"Cancel reservation?"
-)
-){
-return
-}
+ await api(
+  `/reservations/${id}`,
+  {method:"DELETE"}
+ )
 
-await fetch(
-`${API}/reservations/${id}`,
-{
-method:"DELETE"
-}
-)
-
-await loadData()
-
+ await loadAll()
 }
 
 async function reserveRoom(){
 
-const today=
-new Date()
-.toISOString()
-.slice(0,10)
+ const today=
+ new Date()
+ .toISOString()
+ .slice(0,10)
 
-const body={
+ const body={
+  room_id:Number(roomId),
+  title,
+  description:"",
+  start_at:`${today}T${start}:00Z`,
+  end_at:`${today}T${end}:00Z`
+ }
 
-room_id:Number(roomId),
+ const r=await api(
+  "/reservations",
+  {
+   method:"POST",
+   headers:{
+    "Content-Type":"application/json"
+   },
+   body:JSON.stringify(body)
+  }
+ )
 
-user_id:"guest",
+ if(!r.ok){
+  alert(r.error)
+  return
+ }
 
-user_name:USER_NAME,
+ setShowModal(false)
+ setTitle("")
+ setRoomId("")
+ setStart("09:00")
+ setEnd("09:30")
 
-title,
-
-description:"",
-
-start_at:
-`${today}T${start}:00`,
-
-end_at:
-`${today}T${end}:00`
-
+ await loadAll()
 }
 
-if(editingReservation){
+if(!token){
 
-await fetch(
-`${API}/reservations/${editingReservation.id}`,
-{
-method:"PUT",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify(body)
-}
-)
+ return(
+  <div className="container">
 
-}else{
+   <div className="card">
 
-await fetch(
-`${API}/reservations`,
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify(body)
-}
-)
+    <h1>RoomZalazer</h1>
 
-}
+    <input
+     placeholder="Email"
+     value={email}
+     onChange={e=>setEmail(e.target.value)}
+    />
 
-await loadData()
+    <input
+     type="password"
+     placeholder="Password"
+     value={password}
+     onChange={e=>setPassword(e.target.value)}
+    />
 
-setShowModal(false)
+    {registerMode&&(
+     <input
+      placeholder="Name"
+      value={name}
+      onChange={e=>setName(e.target.value)}
+     />
+    )}
 
+    <button
+     className="primary"
+     onClick={
+      registerMode
+      ?register
+      :login
+     }
+    >
+     {registerMode
+      ?"Register"
+      :"Login"}
+    </button>
+
+    <button
+     className="secondary"
+     onClick={()=>
+      setRegisterMode(
+       !registerMode
+      )
+     }
+    >
+     {registerMode
+      ?"Back to Login"
+      :"Create Account"}
+    </button>
+
+   </div>
+
+  </div>
+ )
 }
 
 return(
+ <>
+  <div className="container">
 
-<>
+   <HeaderCard
+    time={time}
+    rooms={rooms.length}
+    reservations={myReservations.length}
+    user={user?.name}
+    onLogout={logout}
+   />
 
-<div className="container">
+   <ReservationList
+    reservations={myReservations}
+    onDelete={deleteReservation}
+   />
 
-<div className="card">
+   {rooms.map(room=>(
+    <RoomCard
+     key={room.id}
+     room={room}
+     reservations={reservations}
+    />
+   ))}
 
-<h1>
-RoomZalazer
-</h1>
+   <div className="footer">
+    RoomZalazer • Auth Enabled
+   </div>
 
-<div className="subtitle">
-Smart Meeting Room Reservation Platform
-</div>
+  </div>
 
-<div className="info">
-<span>Office Time</span>
-<span>{time}</span>
-</div>
+  <button
+   className="float"
+   onClick={()=>
+    setShowModal(true)
+   }
+  >
+   +
+  </button>
 
-<div className="info">
-<span>Working Hours</span>
-<span>09:00 - 19:00</span>
-</div>
-
-<div className="info">
-<span>Total Rooms</span>
-<span>{rooms.length}</span>
-</div>
-
-<div className="info">
-<span>Total Reservations</span>
-<span>{reservations.length}</span>
-</div>
-
-</div>
-
-<ReservationList
-reservations={reservations}
-rooms={rooms}
-userName={USER_NAME}
-onEdit={openEdit}
-onDelete={deleteReservation}
-/>
-
-{rooms.map(room=>(
-
-<RoomCard
-key={room.id}
-room={room}
-reservations={reservations}
-/>
-
-))}
-
-<div className="footer">
-RoomZalazer • Edit Enabled
-</div>
-
-</div>
-
-<button
-className="float"
-onClick={openCreate}
->
-+
-</button>
-
-<ReservationModal
-
-show={showModal}
-
-rooms={rooms}
-
-times={TIMES}
-
-reservations={reservations}
-
-title={title}
-setTitle={setTitle}
-
-roomId={roomId}
-setRoomId={setRoomId}
-
-start={start}
-setStart={setStart}
-
-end={end}
-setEnd={setEnd}
-
-onReserve={reserveRoom}
-
-onClose={()=>
-setShowModal(false)
-}
-
-/>
-
-</>
-
+  <ReservationModal
+   show={showModal}
+   rooms={rooms}
+   times={TIMES}
+   reservations={reservations}
+   title={title}
+   setTitle={setTitle}
+   roomId={roomId}
+   setRoomId={setRoomId}
+   start={start}
+   setStart={setStart}
+   end={end}
+   setEnd={setEnd}
+   onReserve={reserveRoom}
+   onClose={()=>
+    setShowModal(false)
+   }
+  />
+ </>
 )
-
 }

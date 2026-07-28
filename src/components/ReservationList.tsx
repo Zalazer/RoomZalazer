@@ -1,115 +1,78 @@
 type Reservation={
-id:number
-room_id:number
-title:string
-user_name:string
-start_at:string
-end_at:string
-}
-
-type Room={
-id:number
-name:string
+  id:number
+  room_id:number
+  room_name?:string
+  title:string
+  start_at:string
+  end_at:string
+  status?:string
 }
 
 type Props={
-reservations:Reservation[]
-rooms:Room[]
-userName:string
-onEdit:(r:Reservation)=>void
-onDelete:(id:number)=>void
+  reservations:Reservation[]
+  onDelete:(id:number)=>void
 }
 
 export default function ReservationList({
-
-reservations,
-rooms,
-userName,
-onEdit,
-onDelete
-
+  reservations,
+  onDelete
 }:Props){
 
-const myReservations=
-reservations.filter(
-r=>r.user_name===userName
-)
+  return(
+    <div className="card">
 
-function roomName(id:number){
+      <h2>My Reservations</h2>
 
-return(
-rooms.find(
-r=>r.id===id
-)?.name ?? "Unknown"
-)
+      {reservations.length===0 ? (
 
-}
+        <div className="small">
+          No reservations.
+        </div>
 
-return(
+      ) : (
 
-<div className="card">
+        reservations.map(r=>(
 
-<h2>
-Today's Reservations
-</h2>
+          <div
+            key={r.id}
+            className="reservation"
+          >
 
-{myReservations.length===0?(
+            <div className="title">
+              {r.title}
+            </div>
 
-<div className="small">
-No reservations today.
-</div>
+            <div className="small">
+              {r.room_name ?? `Room #${r.room_id}`}
+            </div>
 
-):(myReservations.map(r=>(
+            <div className="small">
+              {new Date(r.start_at).toLocaleString()}
+            </div>
 
-<div
-key={r.id}
-className="reservation"
->
+            <div className="small">
+              {new Date(r.end_at).toLocaleString()}
+            </div>
 
-<div className="title">
-{r.title}
-</div>
+            <div className="small">
+              {r.status ?? "reserved"}
+            </div>
 
-<div className="small">
-Room:
-{" "}
-{roomName(r.room_id)}
-</div>
+            <div className="actions">
+              <button
+                className="secondary"
+                onClick={() => onDelete(r.id)}
+              >
+                Cancel
+              </button>
+            </div>
 
-<div className="small">
-{r.start_at.slice(11,16)}
-{" - "}
-{r.end_at.slice(11,16)}
-</div>
+          </div>
 
-<div className="actions">
+        ))
 
-<button
-className="primary"
-onClick={()=>
-onEdit(r)
-}
->
-Edit
-</button>
+      )}
 
-<button
-className="secondary"
-onClick={()=>
-onDelete(r.id)
-}
->
-Cancel
-</button>
-
-</div>
-
-</div>
-
-)))}
-
-</div>
-
-)
-
+    </div>
+  )
 }
