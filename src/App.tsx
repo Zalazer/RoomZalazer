@@ -62,11 +62,8 @@ return()=>clearInterval(timer)
 
 async function loadData(){
 
-const r1=
-await fetch(`${API}/rooms`)
-
-const r2=
-await fetch(`${API}/reservations`)
+const r1=await fetch(`${API}/rooms`)
+const r2=await fetch(`${API}/reservations`)
 
 setRooms(await r1.json())
 setReservations(await r2.json())
@@ -100,17 +97,23 @@ const s=minutes(start)
 const e=minutes(end)
 
 if(e<=s){
+
 setError(
 "End time must be later than start time."
 )
+
 return
+
 }
 
 if(e-s>240){
+
 setError(
 "Maximum reservation duration is 4 hours."
 )
+
 return
+
 }
 
 const today=
@@ -119,6 +122,7 @@ new Date()
 .slice(0,10)
 
 const body={
+
 room_id:Number(roomId),
 user_id:"guest",
 user_name:USER_NAME,
@@ -126,6 +130,7 @@ title,
 description:"",
 start_at:`${today}T${start}:00`,
 end_at:`${today}T${end}:00`
+
 }
 
 const response=
@@ -201,9 +206,12 @@ Smart Meeting Room Reservation Platform
 </div>
 
 <ReservationList
-reservations={reservations.filter(
+reservations={
+reservations.filter(
 r=>r.user_name===USER_NAME
-)}
+)
+}
+userName={USER_NAME}
 />
 
 {rooms.map(room=>(
@@ -224,7 +232,9 @@ RoomZalazer • Tournament Build
 
 <button
 className="float"
-onClick={()=>setShowModal(true)}
+onClick={()=>
+setShowModal(true)
+}
 >
 +
 </button>
@@ -246,7 +256,9 @@ Meeting title
 <input
 value={title}
 onChange={(e)=>
-setTitle(e.target.value)
+setTitle(
+e.target.value
+)
 }
 />
 
@@ -257,7 +269,9 @@ Room
 <select
 value={roomId}
 onChange={(e)=>
-setRoomId(e.target.value)
+setRoomId(
+e.target.value
+)
 }
 >
 
@@ -285,9 +299,12 @@ Start time
 <select
 value={start}
 onChange={(e)=>
-setStart(e.target.value)
+setStart(
+e.target.value
+)
 }
 >
+
 {TIMES.map(t=>(
 
 <option
@@ -298,6 +315,7 @@ value={t}
 </option>
 
 ))}
+
 </select>
 
 <label>
@@ -307,9 +325,12 @@ End time
 <select
 value={end}
 onChange={(e)=>
-setEnd(e.target.value)
+setEnd(
+e.target.value
+)
 }
 >
+
 {TIMES.map(t=>(
 
 <option
@@ -320,6 +341,7 @@ value={t}
 </option>
 
 ))}
+
 </select>
 
 {error&&(
@@ -332,7 +354,9 @@ value={t}
 
 <button
 className="primary"
-onClick={reserveRoom}
+onClick={
+reserveRoom
+}
 >
 Reserve
 </button>
