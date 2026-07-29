@@ -1,4 +1,3 @@
-
 import{useEffect,useState}from"react"
 import"./App.css"
 import HeaderCard from"./components/HeaderCard"
@@ -12,13 +11,9 @@ import ReservationModal from"./components/ReservationModal"
 const API="https://meeting.shooleeyack.workers.dev"
 const TIMES=["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30"]
 
-const kyivDate=()=>{
- return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())
-}
+const kyivDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())
 
-const kyivTime=()=>{
- return new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date())
-}
+const kyivTime=()=>new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date())
 
 type User={id:string,name:string,email:string}
 type Room={id:number,name:string,capacity:number,description:string}
@@ -31,6 +26,8 @@ const[user,setUser]=useState<User|null>(null)
 const[rooms,setRooms]=useState<Room[]>([])
 const[reservations,setReservations]=useState<Reservation[]>([])
 const[myReservations,setMyReservations]=useState<Reservation[]>([])
+const[showCurrent,setShowCurrent]=useState(false)
+const[showPast,setShowPast]=useState(false)
 const[time,setTime]=useState("")
 const[localTime,setLocalTime]=useState("")
 const[selectedDate,setSelectedDate]=useState(kyivDate())
@@ -53,10 +50,8 @@ setTime(kyivTime())
 setLocalTime(new Date().toLocaleString("en-GB"))
 
 const t=setInterval(()=>{
-
 setTime(kyivTime())
 setLocalTime(new Date().toLocaleString("en-GB"))
-
 },1000)
 
 if(token)loadAll()
@@ -83,23 +78,23 @@ async function loadAll(){
 const me=await api("/auth/me")
 
 if(!me.ok){
-
 localStorage.removeItem("token")
 setToken("")
 setUser(null)
 return
-
 }
 
 setUser(me.user)
 
 setRooms(await api("/rooms"))
-
 setReservations(await api("/reservations"))
 
 const mine=await api("/my/reservations")
 
-setMyReservations(mine.upcoming||[])
+setMyReservations([
+...(mine.upcoming||[]),
+...(mine.past||[])
+])
 
 }
 
@@ -111,11 +106,9 @@ headers:{"Content-Type":"application/json"},
 body:JSON.stringify({email,password})
 })
 
-if(!r.ok)
-return alert(r.error)
+if(!r.ok)return alert(r.error)
 
 localStorage.setItem("token",r.token)
-
 setToken(r.token)
 
 }
@@ -128,11 +121,9 @@ headers:{"Content-Type":"application/json"},
 body:JSON.stringify({name,email,password})
 })
 
-if(!r.ok)
-return alert(r.error)
+if(!r.ok)return alert(r.error)
 
 alert("Registered.")
-
 setRegisterMode(false)
 
 }
@@ -142,28 +133,21 @@ async function logout(){
 await api("/auth/logout",{method:"POST"})
 
 localStorage.removeItem("token")
-
 setToken("")
-
 setUser(null)
 
 }
 
 async function deleteReservation(id:number){
 
-if(!confirm("Cancel reservation?"))
-return
+if(!confirm("Cancel reservation?"))return
 
 await api(`/reservations/${id}`,{method:"DELETE"})
-
 await loadAll()
 
 }
 
-
 async function reserveRoom(){
-
-const now=new Date()
 
 const kyivNow=new Intl.DateTimeFormat(
 "en-GB",
@@ -173,7 +157,7 @@ hour:"2-digit",
 minute:"2-digit",
 hour12:false
 }
-).format(now)
+).format(new Date())
 
 const currentMinutes=
 Number(kyivNow.slice(0,2))*60+
@@ -183,10 +167,7 @@ const startMinutes=
 Number(start.slice(0,2))*60+
 Number(start.slice(3,5))
 
-if(
-selectedDate===kyivDate()&&
-startMinutes<=currentMinutes
-){
+if(selectedDate===kyivDate()&&startMinutes<=currentMinutes){
 alert("This time slot has already passed.")
 return
 }
@@ -205,8 +186,7 @@ headers:{"Content-Type":"application/json"},
 body:JSON.stringify(body)
 })
 
-if(!r.ok)
-return alert(r.error)
+if(!r.ok)return alert(r.error)
 
 setShowModal(false)
 setTitle("")
@@ -218,9 +198,19 @@ await loadAll()
 
 }
 
+const currentReservations=myReservations.filter(
+r=>
+r.status!=="cancelled"&&
+new Date(r.end_at)>new Date()
+)
+
+const pastReservations=myReservations.filter(
+r=>
+r.status==="cancelled"||
+new Date(r.end_at)<=new Date()
+)
 
 if(!token)
-
 return(
 <div className="container">
 <div className="card">
@@ -257,15 +247,38 @@ user={user?.name}
 time={time}
 localTime={localTime}
 rooms={rooms.length}
-reservations={myReservations.length}
+current={currentReservations.length}
+past={pastReservations.length}
 onLogout={logout}
+onCurrent={()=>{
+setShowCurrent(!showCurrent)
+setShowPast(false)
+}}
+onPast={()=>{
+setShowPast(!showPast)
+setShowCurrent(false)
+}}
 />
 
 <CalendarHeader selectedDate={selectedDate}/>
 
 <WeekSelector selectedDate={selectedDate} setSelectedDate={setSelectedDate}/>
 
-<ReservationList reservations={myReservations} onDelete={deleteReservation}/>
+{showCurrent&&
+<ReservationList
+title="Current Reservations"
+reservations={currentReservations}
+onDelete={deleteReservation}
+/>
+}
+
+{showPast&&
+<ReservationList
+title="Past Reservations"
+reservations={pastReservations}
+onDelete={deleteReservation}
+/>
+}
 
 {rooms.map(room=>
 <RoomCard

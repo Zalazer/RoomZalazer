@@ -9,11 +9,13 @@ status?:string
 }
 
 type Props={
+title:string
 reservations:Reservation[]
 onDelete:(id:number)=>void
 }
 
 export default function ReservationList({
+title,
 reservations,
 onDelete
 }:Props){
@@ -47,15 +49,12 @@ minute:"2-digit"
 ).format(new Date(v))
 
 const mins=(a:string,b:string)=>
-(
-new Date(b).getTime()-
-new Date(a).getTime()
-)/60000
+(new Date(b).getTime()-new Date(a).getTime())/60000
 
 return(
 <div className="card">
 
-<h2>My Reservations</h2>
+<h2>{title}</h2>
 
 {list.length===0?
 

@@ -282,3 +282,32 @@ min-width:64px
 }
 
 }
+
+.user-row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:12px;
+font-size:17px;
+font-weight:700
+}
+
+.logout{
+padding:6px 10px;
+font-size:13px;
+border-radius:8px;
+background:var(--card2);
+color:#fff
+}
+
+.reservation-tabs{
+display:flex;
+gap:8px;
+margin-top:12px
+}
+
+.reservation-tabs button{
+flex:1;
+padding:10px;
+font-size:15px
+}

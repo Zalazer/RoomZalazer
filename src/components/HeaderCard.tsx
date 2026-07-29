@@ -2,18 +2,24 @@ type Props={
 time:string
 localTime:string
 rooms:number
-reservations:number
+current:number
+past:number
 user?:string
 onLogout?:()=>void
+onCurrent?:()=>void
+onPast?:()=>void
 }
 
 export default function HeaderCard({
 time,
 localTime,
 rooms,
-reservations,
+current,
+past,
 user,
-onLogout
+onLogout,
+onCurrent,
+onPast
 }:Props){
 
 return(
@@ -26,9 +32,15 @@ Smart Meeting Room Reservation Platform
 </div>
 
 {user&&
-<div className="info">
-<span>User</span>
+<div className="user-row">
 <span>{user}</span>
+
+<button
+className="logout"
+onClick={onLogout}
+>
+Logout
+</button>
 </div>
 }
 
@@ -52,16 +64,23 @@ Smart Meeting Room Reservation Platform
 <span>{rooms}</span>
 </div>
 
-<div className="info">
-<span>My Reservations</span>
-<span>{reservations}</span>
-</div>
+<div className="reservation-tabs">
 
-{user&&
-<button className="secondary" onClick={onLogout}>
-Logout
+<button
+className="secondary"
+onClick={onCurrent}
+>
+Current ({current})
 </button>
-}
+
+<button
+className="secondary"
+onClick={onPast}
+>
+Past ({past})
+</button>
+
+</div>
 
 </div>
 )
