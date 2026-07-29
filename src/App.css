@@ -108,7 +108,7 @@ flex-wrap:wrap
 
 .nav button{
 background:var(--card2);
-color:#fff;
+color:#fff
 }
 
 .room-head{
@@ -263,26 +263,6 @@ margin-top:18px;
 font-size:14px
 }
 
-@media(max-width:650px){
-
-.room-head{
-flex-direction:row;
-}
-
-h1{
-font-size:28px
-}
-
-h2{
-font-size:22px
-}
-
-.day{
-min-width:64px
-}
-
-}
-
 .user-row{
 display:flex;
 justify-content:space-between;
@@ -310,4 +290,54 @@ margin-top:12px
 flex:1;
 padding:10px;
 font-size:15px
+}
+
+.room-modal{
+padding:12px;
+max-width:430px
+}
+
+.room-modal h2{
+font-size:20px
+}
+
+.room-slot{
+font-size:13px;
+margin-bottom:4px;
+line-height:1.1
+}
+
+.room-slot span:last-child{
+max-width:250px;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap
+}
+
+@media(max-width:650px){
+
+.room-head{
+flex-direction:row
+}
+
+h1{
+font-size:28px
+}
+
+h2{
+font-size:22px
+}
+
+.day{
+min-width:64px
+}
+
+.room-slot{
+font-size:12px
+}
+
+.room-modal h2{
+font-size:18px
+}
+
 }

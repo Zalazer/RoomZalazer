@@ -27,7 +27,7 @@ return(
 <button className="secondary" onClick={()=>add(30)}>{">>"}</button>
 </div>
 
-<div style={{display:"flex",gap:"8px",overflowX:"auto",justifyContent:"center"}}>
+<div style={{display:"flex",gap:"6px",justifyContent:"center"}}>
 {[0,1,2,3,4].map(i=>{
 
 const d=new Date(current)
@@ -38,6 +38,7 @@ const value=d.toISOString().slice(0,10)
 return(
 <button
 key={value}
+style={{padding:"10px 8px",fontSize:"15px",minWidth:"58px"}}
 className={value===selectedDate?"primary":"secondary"}
 onClick={()=>setSelectedDate(value)}
 >
@@ -51,3 +52,4 @@ onClick={()=>setSelectedDate(value)}
 </div>
 )
 }
+

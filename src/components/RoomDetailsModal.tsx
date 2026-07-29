@@ -42,31 +42,39 @@ r=>r.room_id===room.id&&r.start_at.slice(0,10)===selectedDate
 
 return(
 <div className="modal">
-<div className="modal-content">
+<div className="modal-content room-modal">
 
-<h2>{room.name}</h2>
-
-<div className="small">
-Capacity: {room.capacity}
-</div>
-
-<br/>
+<h2 style={{marginBottom:"10px"}}>
+{room.name} • Capacity: {room.capacity}
+</h2>
 
 {TIMES.map(time=>{
 
-const item=list.find(r=>r.start_at.slice(11,16)===time)
+const item=list.find(r=>{
+
+const start=r.start_at.slice(11,16)
+const end=r.end_at.slice(11,16)
+
+return time>=start&&time<end
+
+})
 
 return(
 <div
 key={time}
-className="info"
+className="info room-slot"
+style={{
+color:item?"#ffc0c0":"#97ffbd"
+}}
 >
 <span>{time}</span>
+
 <span>
 {item
-?`${item.title} (${item.user_name||"User"})`
+?`${item.start_at.slice(11,16)}-${item.end_at.slice(11,16)} ${item.title}`
 :"FREE"}
 </span>
+
 </div>
 )
 
