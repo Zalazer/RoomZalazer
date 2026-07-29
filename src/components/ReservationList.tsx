@@ -1,78 +1,110 @@
 type Reservation={
-  id:number
-  room_id:number
-  room_name?:string
-  title:string
-  start_at:string
-  end_at:string
-  status?:string
+id:number
+room_id:number
+room_name?:string
+title:string
+start_at:string
+end_at:string
+status?:string
 }
 
 type Props={
-  reservations:Reservation[]
-  onDelete:(id:number)=>void
+reservations:Reservation[]
+onDelete:(id:number)=>void
 }
 
 export default function ReservationList({
-  reservations,
-  onDelete
+reservations,
+onDelete
 }:Props){
 
-  return(
-    <div className="card">
+const list=[...reservations].sort((a,b)=>{
 
-      <h2>My Reservations</h2>
+const ac=a.status==="cancelled"
+const bc=b.status==="cancelled"
 
-      {reservations.length===0 ? (
+if(ac&&!bc)return 1
+if(!ac&&bc)return-1
 
-        <div className="small">
-          No reservations.
-        </div>
+return(
+new Date(a.start_at).getTime()-
+new Date(b.start_at).getTime()
+)
 
-      ) : (
+})
 
-        reservations.map(r=>(
+const fmt=(v:string)=>
+new Intl.DateTimeFormat(
+"uk-UA",
+{
+timeZone:"Europe/Kyiv",
+day:"2-digit",
+month:"2-digit",
+year:"numeric",
+hour:"2-digit",
+minute:"2-digit"
+}
+).format(new Date(v))
 
-          <div
-            key={r.id}
-            className="reservation"
-          >
+const mins=(a:string,b:string)=>
+(
+new Date(b).getTime()-
+new Date(a).getTime()
+)/60000
 
-            <div className="title">
-              {r.title}
-            </div>
+return(
+<div className="card">
 
-            <div className="small">
-              {r.room_name ?? `Room #${r.room_id}`}
-            </div>
+<h2>My Reservations</h2>
 
-            <div className="small">
-              {new Date(r.start_at).toLocaleString()}
-            </div>
+{list.length===0?
 
-            <div className="small">
-              {new Date(r.end_at).toLocaleString()}
-            </div>
+<div className="small">
+No reservations.
+</div>
 
-            <div className="small">
-              {r.status ?? "reserved"}
-            </div>
+:
 
-            <div className="actions">
-              <button
-                className="secondary"
-                onClick={() => onDelete(r.id)}
-              >
-                Cancel
-              </button>
-            </div>
+list.map(r=>{
 
-          </div>
+const start=fmt(r.start_at)
+const end=fmt(r.end_at).slice(-5)
 
-        ))
+return(
 
-      )}
+<div
+key={r.id}
+className="reservation"
+>
 
-    </div>
-  )
+<div className="title">
+{r.room_name??`Room #${r.room_id}`} • {r.title}
+</div>
+
+<div className="small">
+{start} - {end} ({mins(r.start_at,r.end_at)} min) • {r.status??"reserved"}
+</div>
+
+{r.status!=="cancelled"&&
+<div className="actions">
+<button
+className="secondary"
+onClick={()=>onDelete(r.id)}
+>
+Cancel
+</button>
+</div>
+}
+
+</div>
+
+)
+
+})
+
+}
+
+</div>
+)
+
 }
