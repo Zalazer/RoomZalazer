@@ -14,9 +14,12 @@ type Reservation={
 
 type Props={
  show:boolean
+
  rooms:Room[]
  times:string[]
  reservations:Reservation[]
+
+ selectedDate:string
 
  title:string
  setTitle:(v:string)=>void
@@ -32,6 +35,7 @@ type Props={
 
  onReserve:()=>void
  onClose:()=>void
+
  editing?:boolean
 }
 
@@ -40,148 +44,295 @@ export default function ReservationModal({
  rooms,
  times,
  reservations,
+
+ selectedDate,
+
  title,
  setTitle,
+
  roomId,
  setRoomId,
+
  start,
  setStart,
+
  end,
  setEnd,
+
  onReserve,
  onClose,
+
  editing=false
+
 }:Props){
 
  if(!show)return null
 
  const M=(v:string)=>
-  Number(v.slice(0,2))*60+Number(v.slice(3,5))
+  Number(v.slice(0,2))*60+
+  Number(v.slice(3,5))
 
- const roomReservations=reservations
- .filter(r=>r.room_id===Number(roomId))
- .sort((a,b)=>a.start_at.localeCompare(b.start_at))
+ const roomReservations=
+ reservations
+ .filter(
+  r=>
+   r.room_id===Number(roomId) &&
+   r.start_at.slice(0,10)===selectedDate
+ )
+ .sort(
+  (a,b)=>
+   a.start_at.localeCompare(
+    b.start_at
+   )
+ )
 
- const availableStartTimes=times.filter(t=>{
+ // 19:00 нельзя выбирать как начало
+ const startTimes=
+ times.filter(
+  t=>t!=="19:00"
+ )
+
+ const availableStartTimes=
+ startTimes.filter(t=>{
+
   const m=M(t)
 
   return !roomReservations.some(r=>{
-   const s=M(r.start_at.slice(11,16))
-   const e=M(r.end_at.slice(11,16))
+
+   const s=
+   M(
+    r.start_at.slice(11,16)
+   )
+
+   const e=
+   M(
+    r.end_at.slice(11,16)
+   )
+
    return m>=s&&m<e
+
   })
+
  })
 
- const nextBusy=roomReservations
- .map(r=>M(r.start_at.slice(11,16)))
- .find(m=>m>M(start))
+ const nextBusy=
+ roomReservations
+ .map(
+  r=>
+   M(
+    r.start_at.slice(11,16)
+   )
+ )
+ .find(
+  m=>m>M(start)
+ )
 
- const availableEndTimes=times.filter(t=>{
-  const s=M(start),e=M(t)
+ const availableEndTimes=
+ times.filter(t=>{
+
+  const s=M(start)
+  const e=M(t)
 
   return(
+
    e>s &&
    e<=s+240 &&
    e<=1140 &&
-   (nextBusy===undefined||e<=nextBusy)
+
+   (
+    nextBusy===undefined ||
+    e<=nextBusy
+   )
+
   )
+
  })
 
  useEffect(()=>{
+
   if(
    availableStartTimes.length &&
    !availableStartTimes.includes(start)
-  ) setStart(availableStartTimes[0])
- },[roomId])
+  ){
+
+   setStart(
+    availableStartTimes[0]
+   )
+
+  }
+
+ },[
+  roomId,
+  selectedDate
+ ])
 
  useEffect(()=>{
+
   if(
    availableEndTimes.length &&
    !availableEndTimes.includes(end)
-  ) setEnd(availableEndTimes[0])
- },[start,roomId])
+  ){
+
+   setEnd(
+    availableEndTimes[0]
+   )
+
+  }
+
+ },[
+  start,
+  roomId,
+  selectedDate
+ ])
 
  return(
+
   <div className="modal">
-   <div className="modal-box">
+
+   <div className="modal-content">
 
     <h2>
-     {editing?"Edit Reservation":"Reserve Meeting Room"}
+
+     {editing
+      ?"Edit Reservation"
+      :"Reserve Meeting Room"
+     }
+
     </h2>
 
-    <label>Meeting title</label>
+    <div className="small">
+     {selectedDate}
+    </div>
+
+    <label>
+     Meeting title
+    </label>
 
     <input
      value={title}
-     onChange={e=>setTitle(e.target.value)}
+     onChange={
+      e=>
+      setTitle(
+       e.target.value
+      )
+     }
     />
 
-    <label>Room</label>
+    <label>
+     Room
+    </label>
 
     <select
      value={roomId}
-     onChange={e=>setRoomId(e.target.value)}
+     onChange={
+      e=>
+      setRoomId(
+       e.target.value
+      )
+     }
     >
+
      <option value="">
       Select room
      </option>
 
      {rooms.map(r=>(
+
       <option
        key={r.id}
        value={r.id}
       >
        {r.name}
       </option>
+
      ))}
+
     </select>
 
-    <label>Start time</label>
+    <label>
+     Start time
+    </label>
 
     <select
      value={start}
-     onChange={e=>setStart(e.target.value)}
+     onChange={
+      e=>
+      setStart(
+       e.target.value
+      )
+     }
     >
+
      {availableStartTimes.map(t=>(
-      <option key={t} value={t}>
+
+      <option
+       key={t}
+       value={t}
+      >
        {t}
       </option>
+
      ))}
+
     </select>
 
-    <label>End time</label>
+    <label>
+     End time
+    </label>
 
     <select
      value={end}
-     onChange={e=>setEnd(e.target.value)}
+     onChange={
+      e=>
+      setEnd(
+       e.target.value
+      )
+     }
     >
+
      {availableEndTimes.map(t=>(
-      <option key={t} value={t}>
+
+      <option
+       key={t}
+       value={t}
+      >
        {t}
       </option>
+
      ))}
+
     </select>
 
-    <button
-     className="primary"
-     disabled={
-      !title||
-      !roomId||
-      !availableEndTimes.length
-     }
-     onClick={onReserve}
-    >
-     {editing?"Save Changes":"Reserve"}
-    </button>
+    <div className="modal-buttons">
 
-    <button
-     className="secondary"
-     onClick={onClose}
-    >
-     Close
-    </button>
+     <button
+      className="primary"
+      disabled={
+       !title ||
+       !roomId ||
+       !availableEndTimes.length
+      }
+      onClick={onReserve}
+     >
+      {editing
+       ?"Save Changes"
+       :"Reserve"
+      }
+     </button>
+
+     <button
+      className="secondary"
+      onClick={onClose}
+     >
+      Close
+     </button>
+
+    </div>
 
    </div>
+
   </div>
+
  )
+
 }

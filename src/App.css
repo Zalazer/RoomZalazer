@@ -67,6 +67,50 @@ margin-bottom:10px;
 font-size:17px
 }
 
+.calendar{
+display:flex;
+gap:8px;
+overflow-x:auto;
+margin-bottom:16px;
+padding-bottom:4px
+}
+
+.day{
+min-width:72px;
+padding:10px;
+border-radius:12px;
+background:var(--card2);
+text-align:center;
+cursor:pointer;
+border:2px solid transparent
+}
+
+.day.active{
+border-color:var(--green)
+}
+
+.day-name{
+font-size:14px;
+opacity:.7
+}
+
+.day-date{
+font-size:18px;
+font-weight:700
+}
+
+.nav{
+display:flex;
+gap:8px;
+margin-bottom:16px;
+flex-wrap:wrap
+}
+
+.nav button{
+background:var(--card2);
+color:#fff;
+}
+
 .room-head{
 display:flex;
 justify-content:space-between;
@@ -99,11 +143,6 @@ background:#582121;
 color:#ffc0c0
 }
 
-.meeting{
-background:#5b4217;
-color:#ffd994
-}
-
 .timeline{
 display:flex;
 gap:2px;
@@ -117,11 +156,13 @@ height:14px;
 flex:1
 }
 
-.tf{background:var(--green)}
-.tr{background:var(--red)}
-.tm{background:var(--orange)}
-.ty{background:var(--blue)}
-.tym{background:var(--purple)}
+.tf{
+background:var(--green)
+}
+
+.tr{
+background:var(--red)
+}
 
 .desc{
 line-height:1.5;
@@ -215,16 +256,6 @@ margin-top:20px
 flex:1
 }
 
-.box{
-margin-top:12px;
-padding:14px;
-border-radius:12px;
-background:#582121;
-color:#ffc0c0;
-font-size:16px;
-line-height:1.5
-}
-
 .footer{
 text-align:center;
 opacity:.5;
@@ -236,11 +267,6 @@ font-size:14px
 
 .room-head{
 flex-direction:row;
-align-items:center
-}
-
-.modal-content{
-max-width:100%
 }
 
 h1{
@@ -251,10 +277,8 @@ h2{
 font-size:22px
 }
 
-input,
-select,
-button{
-font-size:18px
+.day{
+min-width:64px
 }
 
 }

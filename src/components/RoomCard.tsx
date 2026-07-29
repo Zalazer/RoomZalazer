@@ -1,63 +1,30 @@
 import Timeline from "./Timeline"
 
-type Reservation={
- id:number
- room_id:number
- title:string
- user_name?:string
- start_at:string
- end_at:string
-}
-
-type Room={
- id:number
- name:string
- capacity:number
- description:string
-}
+type Reservation={id:number;room_id:number;title:string;user_name?:string;start_at:string;end_at:string}
+type Room={id:number;name:string;capacity:number;description:string}
 
 type Props={
- room:Room
- reservations:Reservation[]
+room:Room
+reservations:Reservation[]
+selectedDate:string
+onClick:()=>void
 }
 
-export default function RoomCard({
- room,
- reservations
-}:Props){
+export default function RoomCard({room,reservations,selectedDate,onClick}:Props){
 
- const count=reservations.filter(
-  r=>r.room_id===room.id
- ).length
+const count=reservations.filter(r=>r.room_id===room.id&&r.start_at.slice(0,10)===selectedDate).length
 
- return(
-  <div className="room-card">
+return(
+<div className="room-card" onClick={onClick}>
+<div className="room-head">
+<div className="room-name">{room.name} 👥{room.capacity}</div>
+<div className={`status ${count?"reserved":"available"}`}>{count?"Busy":"Available"}</div>
+</div>
 
-   <div className="room-head">
+<Timeline roomId={room.id} reservations={reservations} selectedDate={selectedDate}/>
 
-    <div className="room-name">
-     {room.name} 👥{room.capacity}
-    </div>
-
-    <div className="status available">
-     {count?"Busy":"Available"}
-    </div>
-
-   </div>
-
-   <Timeline
-    roomId={room.id}
-    reservations={reservations}
-   />
-
-   <div className="desc">
-    {room.description}
-   </div>
-
-   <div className="small">
-    Reservations: {count}
-   </div>
-
-  </div>
- )
+<div className="desc">{room.description}</div>
+<div className="small">Reservations: {count}</div>
+</div>
+)
 }
