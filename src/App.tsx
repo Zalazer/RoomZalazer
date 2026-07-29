@@ -16,59 +16,24 @@ if(!a.token)
 return(
 <div className="container">
 <div className="card">
-
 <h1>RoomZalazer</h1>
-
-<input
-placeholder="Email"
-value={a.email}
-onChange={e=>a.setEmail(e.target.value)}
-/>
-
-{a.loginError&&
-<div className="error">{a.loginError}</div>
-}
-
-<input
-type="password"
-placeholder="Password"
-value={a.password}
-onChange={e=>a.setPassword(e.target.value)}
-/>
-
-{a.registerMode&&
-<input
-placeholder="Name"
-value={a.name}
-onChange={e=>a.setName(e.target.value)}
-/>
-}
-
-{a.registerError&&
-<div className="error">{a.registerError}</div>
-}
-
-<button
-className="primary"
-onClick={a.registerMode?a.register:a.login}
->
+<input placeholder="Email" value={a.email} onChange={e=>a.setEmail(e.target.value)}/>
+{a.loginError&&<div className="error">{a.loginError}</div>}
+<input type="password" placeholder="Password" value={a.password} onChange={e=>a.setPassword(e.target.value)}/>
+{a.registerMode&&<input placeholder="Name" value={a.name} onChange={e=>a.setName(e.target.value)}/>}
+{a.registerError&&<div className="error">{a.registerError}</div>}
+<button className="primary" onClick={a.registerMode?a.register:a.login}>
 {a.registerMode?"Register":"Login"}
 </button>
-
-<button
-className="secondary"
-onClick={()=>a.setRegisterMode(!a.registerMode)}
->
+<button className="secondary" onClick={()=>a.setRegisterMode(!a.registerMode)}>
 {a.registerMode?"Back to Login":"Create Account"}
 </button>
-
 </div>
 </div>
 )
 
 return(
 <>
-
 <div className="container">
 
 <HeaderCard
@@ -94,6 +59,7 @@ a.setShowCurrent(false)
 title="Current Reservations"
 reservations={a.currentReservations}
 onDelete={a.deleteReservation}
+onEdit={a.editReservation}
 />
 }
 
@@ -102,6 +68,7 @@ onDelete={a.deleteReservation}
 title="Past Reservations"
 reservations={a.pastReservations}
 onDelete={a.deleteReservation}
+onEdit={a.editReservation}
 />
 }
 
@@ -128,10 +95,7 @@ RoomZalazer • Google Calendar Style
 
 </div>
 
-<button
-className="float"
-onClick={()=>a.setShowModal(true)}
->
+<button className="float" onClick={()=>a.setShowModal(true)}>
 +
 </button>
 
@@ -151,6 +115,7 @@ end={a.end}
 setEnd={a.setEnd}
 onReserve={a.reserveRoom}
 onClose={()=>a.setShowModal(false)}
+editing={a.editing}
 error={a.reserveError}
 loading={a.isReserving}
 />
