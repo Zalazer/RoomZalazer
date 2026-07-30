@@ -62,30 +62,38 @@ Logout
 
 <div className="info">
 <span>Working Hours</span>
-<span>{workingHoursText}</span>
-</div>
 
 <div
 style={{
 display:"flex",
-gap:"8px",
-marginTop:"10px",
-marginBottom:"10px"
+alignItems:"center",
+gap:"8px"
 }}
 >
-<button
-className={timeMode==="kyiv"?"primary":"secondary"}
-onClick={()=>setTimeMode("kyiv")}
->
-Kyiv Time
-</button>
+
+<span>{workingHoursText}</span>
 
 <button
-className={timeMode==="local"?"primary":"secondary"}
-onClick={()=>setTimeMode("local")}
+className="primary"
+style={{
+padding:"2px 10px",
+fontSize:"12px",
+minWidth:"60px"
+}}
+onClick={()=>
+setTimeMode(
+timeMode==="kyiv"
+?"local"
+:"kyiv"
+)
+}
 >
-Local Time
+{timeMode==="kyiv"
+?"Kyiv"
+:"Local"}
 </button>
+
+</div>
 </div>
 
 <div className="info">

@@ -5,7 +5,20 @@ const API="https://meeting.shooleeyack.workers.dev"
 export const TIMES=["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30"]
 
 export const kyivDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())
-export const kyivTime=()=>new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date())
+
+export const kyivTime=()=>new Intl.DateTimeFormat(
+"en-GB",
+{
+timeZone:"Europe/Kyiv",
+day:"2-digit",
+month:"2-digit",
+year:"numeric",
+hour:"2-digit",
+minute:"2-digit",
+second:"2-digit",
+hour12:false
+}
+).format(new Date())
 
 export type User={id:string,name:string,email:string}
 export type Room={id:number,name:string,capacity:number,description:string}
@@ -394,10 +407,11 @@ hour12:false
 }
 ).format(new Date(v))
 
+
 const workingHoursText=(()=>{
 
 if(timeMode==="kyiv"){
-return"09:00 - 19:00 (Kyiv)"
+return"09:00 - 19:00"
 }
 
 const today=kyivDate()
@@ -423,7 +437,7 @@ hour12:false
 }
 ).format(end)
 
-return`${s} - ${e} (Your local time)`
+return`${s} - ${e}`
 
 })()
 
