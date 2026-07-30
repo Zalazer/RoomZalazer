@@ -61,6 +61,11 @@ timeMode={a.timeMode}
 formatDateTime={a.formatDateTime}
 onDelete={a.deleteReservation}
 onEdit={a.editReservation}
+onOpenPast={r=>{
+a.setSelectedDate(r.start_at.slice(0,10))
+const room=a.rooms.find(v=>v.id===r.room_id)
+if(room)a.setSelectedRoom(room)
+}}
 />
 }
 
@@ -72,6 +77,11 @@ timeMode={a.timeMode}
 formatDateTime={a.formatDateTime}
 onDelete={a.deleteReservation}
 onEdit={a.editReservation}
+onOpenPast={r=>{
+a.setSelectedDate(r.start_at.slice(0,10))
+const room=a.rooms.find(v=>v.id===r.room_id)
+if(room)a.setSelectedRoom(room)
+}}
 />
 }
 
@@ -135,8 +145,13 @@ room={a.selectedRoom}
 reservations={a.reservations}
 selectedDate={a.selectedDate}
 timeMode={a.timeMode}
+times={a.TIMES}
 onClose={()=>a.setSelectedRoom(null)}
-onCreate={()=>a.setShowModal(true)}
+onCreate={()=>{
+a.setRoomId(String(a.selectedRoom!.id))
+a.setSelectedRoom(null)
+a.setShowModal(true)
+}}
 />
 }
 

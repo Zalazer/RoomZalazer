@@ -49,12 +49,34 @@ if(!show)return null
 
 const M=(v:string)=>Number(v.slice(0,2))*60+Number(v.slice(3,5))
 
+const fmt=(v:string)=>
+new Intl.DateTimeFormat(
+"en-GB",
+{
+hour:"2-digit",
+minute:"2-digit",
+hour12:false,
+timeZone:
+timeMode==="kyiv"
+?"Europe/Kyiv"
+:undefined
+}
+).format(new Date(v))
+
 const roomReservations=
 reservations
 .filter(
 r=>
 r.room_id===Number(roomId)&&
-r.start_at.slice(0,10)===selectedDate
+new Intl.DateTimeFormat(
+"en-CA",
+{
+timeZone:
+timeMode==="kyiv"
+?"Europe/Kyiv"
+:undefined
+}
+).format(new Date(r.start_at))===selectedDate
 )
 .sort(
 (a,b)=>a.start_at.localeCompare(b.start_at)
@@ -68,8 +90,8 @@ const m=M(t)
 
 return !roomReservations.some(r=>{
 
-const s=M(r.start_at.slice(11,16))
-const e=M(r.end_at.slice(11,16))
+const s=M(fmt(r.start_at))
+const e=M(fmt(r.end_at))
 
 return m>=s&&m<e
 
@@ -79,7 +101,7 @@ return m>=s&&m<e
 
 const nextBusy=
 roomReservations
-.map(r=>M(r.start_at.slice(11,16)))
+.map(r=>M(fmt(r.start_at)))
 .find(m=>m>M(start))
 
 const availableEndTimes=

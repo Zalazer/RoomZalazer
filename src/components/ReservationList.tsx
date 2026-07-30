@@ -16,6 +16,7 @@ timeMode:"kyiv"|"local"
 formatDateTime:(v:string)=>string
 onDelete:(id:number)=>void
 onEdit:(id:number)=>void
+onOpenPast?:(r:Reservation)=>void
 }
 
 export default function ReservationList({
@@ -24,14 +25,19 @@ reservations,
 timeMode,
 formatDateTime,
 onDelete,
-onEdit
+onEdit,
+onOpenPast
 }:Props){
+
+const now=Date.now()
 
 const list=[...reservations].sort((a,b)=>{
 const ac=a.status==="cancelled"
 const bc=b.status==="cancelled"
+
 if(ac&&!bc)return 1
 if(!ac&&bc)return-1
+
 return new Date(a.start_at).getTime()-new Date(b.start_at).getTime()
 })
 
@@ -44,7 +50,14 @@ formatDateTime(v).split(", ").pop()||""
 return(
 <div className="card">
 
-<h2>{title}</h2>
+<h2>
+{title}
+{title.toLowerCase().includes("past")&&
+<span className="small">
+&nbsp;(Tap to view)
+</span>
+}
+</h2>
 
 <div className="small" style={{marginBottom:"10px"}}>
 Viewing in {timeMode==="kyiv"?"Kyiv time":"your local time"}
@@ -58,9 +71,46 @@ No reservations.
 
 :
 
-list.map(r=>(
+list.map(r=>{
 
-<div key={r.id} className="reservation">
+const finished=
+r.status!=="cancelled"&&
+new Date(r.end_at).getTime()<now
+
+const displayStatus=
+r.status==="cancelled"
+?"cancelled"
+:finished
+?"finished"
+:"reserved"
+
+const clickable=
+displayStatus==="finished"||displayStatus==="cancelled"
+
+return(
+
+<div
+key={r.id}
+className="reservation"
+style={{
+background:
+displayStatus==="finished"
+?"rgba(255,255,255,.05)"
+:displayStatus==="cancelled"
+?"rgba(255,80,80,.06)"
+:undefined,
+cursor:
+clickable
+?"pointer"
+:"default",
+marginBottom:"6px"
+}}
+onClick={()=>{
+if(clickable){
+onOpenPast?.(r)
+}
+}}
+>
 
 <div className="title">
 {formatDateTime(r.start_at)} - {t(r.end_at)} ({mins(r.start_at,r.end_at)} min)
@@ -71,30 +121,40 @@ list.map(r=>(
 </div>
 
 <div className="small">
-{r.room_name??`Room #${r.room_id}`} • {r.room_capacity??"?"} seats&nbsp;&nbsp;&nbsp;Status: {r.status??"reserved"}
+{r.room_name??`Room #${r.room_id}`} • {r.room_capacity??"?"} seats&nbsp;&nbsp;&nbsp;Status: {displayStatus}
 </div>
 
-{r.status!=="cancelled"&&
+{displayStatus==="reserved"&&
 <div className="actions">
+
 <button
 className="secondary"
-onClick={()=>onEdit(r.id)}
+onClick={e=>{
+e.stopPropagation()
+onEdit(r.id)
+}}
 >
 Edit
 </button>
 
 <button
 className="secondary"
-onClick={()=>onDelete(r.id)}
+onClick={e=>{
+e.stopPropagation()
+onDelete(r.id)
+}}
 >
 Cancel
 </button>
+
 </div>
 }
 
 </div>
 
-))
+)
+
+})
 
 }
 

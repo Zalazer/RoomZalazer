@@ -20,6 +20,65 @@ hour12:false
 }
 ).format(new Date())
 
+
+export const getTimes=(mode:"kyiv"|"local")=>{
+
+if(mode==="kyiv") return TIMES
+
+const today=kyivDate()
+
+const result:string[]=[]
+
+for(let h=9;h<19;h++){
+ for(const m of [0,30]){
+
+  const d=new Date(
+   `${today}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00+03:00`
+  )
+
+  result.push(
+   new Intl.DateTimeFormat(
+    "en-GB",
+    {
+     hour:"2-digit",
+     minute:"2-digit",
+     hour12:false
+    }
+   ).format(d)
+  )
+ }
+}
+
+return result
+}
+
+
+
+const toUTC=(date:string,time:string)=>{
+
+const local=new Date(`${date}T${time}:00`)
+
+return local.toISOString().slice(0,19)
+
+}
+
+const fromUTC=(value:string,mode:"kyiv"|"local")=>
+
+new Intl.DateTimeFormat(
+"en-GB",
+{
+hour:"2-digit",
+minute:"2-digit",
+hour12:false,
+timeZone:
+mode==="kyiv"
+?"Europe/Kyiv"
+:undefined
+}
+).format(new Date(value))
+
+
+
 export type User={id:string,name:string,email:string}
 export type Room={id:number,name:string,capacity:number,description:string}
 
@@ -37,19 +96,86 @@ status?:string
 
 const mins=(v:string)=>Number(v.slice(0,2))*60+Number(v.slice(3,5))
 
-const nextSlot=(reservations:Reservation[],date:string)=>{
-const now=new Date(new Date().toLocaleString("en-US",{timeZone:"Europe/Kyiv"}))
-const m=now.getHours()*60+now.getMinutes()
-let slot=Math.ceil(m/30)*30
-if(date!==kyivDate())slot=540
-if(slot<540)slot=540
-const busy=reservations.filter(r=>r.start_at.startsWith(date)).map(r=>({s:mins(r.start_at.slice(11,16)),e:mins(r.end_at.slice(11,16))}))
-while(slot<1140){
-const clash=busy.find(v=>slot>=v.s&&slot<v.e)
-if(!clash)return`${String(Math.floor(slot/60)).padStart(2,"0")}:${String(slot%60).padStart(2,"0")}`
-slot=clash.e
-}
-return TIMES[TIMES.length-1]
+const nextSlot=(
+ reservations:Reservation[],
+ date:string,
+ mode:"kyiv"|"local"
+)=>{
+
+ const now=
+ mode==="kyiv"
+ ?new Date(
+   new Date().toLocaleString(
+    "en-US",
+    {timeZone:"Europe/Kyiv"}
+   )
+  )
+ :new Date()
+
+ let slot=
+ Math.ceil(
+  (now.getHours()*60+now.getMinutes())/30
+ )*30
+
+ const today=
+ mode==="kyiv"
+ ?kyivDate()
+ :new Intl.DateTimeFormat(
+    "en-CA"
+   ).format(new Date())
+
+ if(date!==today){
+  slot=540
+ }
+
+ if(slot<540)slot=540
+
+ const busy=
+ reservations
+ .filter(r=>{
+
+  const d=
+   new Intl.DateTimeFormat(
+    "en-CA",
+    {
+     timeZone:
+      mode==="kyiv"
+      ?"Europe/Kyiv"
+      :undefined
+    }
+   ).format(new Date(r.start_at))
+
+  return d===date
+
+ })
+ .map(r=>({
+
+  s:mins(fromUTC(r.start_at,mode)),
+  e:mins(fromUTC(r.end_at,mode))
+
+ }))
+
+ while(slot<1140){
+
+  const clash=
+   busy.find(
+    v=>slot>=v.s&&slot<v.e
+   )
+
+  if(!clash){
+
+   return `${String(
+    Math.floor(slot/60)
+   ).padStart(2,"0")}:${String(
+    slot%60
+   ).padStart(2,"0")}`
+
+  }
+
+  slot=clash.e
+ }
+
+ return TIMES[TIMES.length-1]
 }
 
 export function useAppData(){
@@ -78,7 +204,11 @@ const[showModal,_setShowModal]=useState(false)
 
 const setShowModal=(v:boolean)=>{
 if(v){
-const s=nextSlot(reservations,selectedDate)
+const s=nextSlot(
+ reservations,
+ selectedDate,
+ timeMode
+)
 setStart(s)
 const e=mins(s)+30
 setEnd(`${String(Math.floor(e/60)).padStart(2,"0")}:${String(e%60).padStart(2,"0")}`)
@@ -130,7 +260,11 @@ useEffect(()=>{
 if(timeMode==="kyiv"){
 setSelectedDate(kyivDate())
 }else{
-setSelectedDate(new Date().toISOString().slice(0,10))
+setSelectedDate(
+ new Intl.DateTimeFormat(
+  "en-CA"
+ ).format(new Date())
+)
 }
 },[timeMode])
 
@@ -241,8 +375,8 @@ setEditingId(id)
 
 setTitle(r.title)
 setRoomId(String(r.room_id))
-setStart(r.start_at.slice(11,16))
-setEnd(r.end_at.slice(11,16))
+setStart(fromUTC(r.start_at,timeMode))
+setEnd(fromUTC(r.end_at,timeMode))
 
 _setShowModal(true)
 
@@ -268,8 +402,8 @@ body:JSON.stringify({
 room_id:Number(roomId),
 title:title.trim(),
 description:"",
-start_at:`${selectedDate}T${start}:00`,
-end_at:`${selectedDate}T${end}:00`
+start_at:toUTC(selectedDate,start),
+end_at:toUTC(selectedDate,end)
 })
 })
 if(!r.ok){
@@ -329,13 +463,14 @@ setReserveError("Working hours are 09:00-19:00.")
 return
 }
 
-const nowKyiv=new Date(new Date().toLocaleString("en-US",{timeZone:"Europe/Kyiv"}))
+const selected=
+new Date(
+ toUTC(selectedDate,start)
+)
 
-const selected=new Date(`${selectedDate}T${start}:00`)
-
-if(selected<=nowKyiv){
-setReserveError("Cannot reserve past time.")
-return
+if(selected<=new Date()){
+ setReserveError("Cannot reserve past time.")
+ return
 }
 
 setIsReserving(true)
@@ -347,8 +482,8 @@ body:JSON.stringify({
 room_id:Number(roomId),
 title:clean,
 description:"",
-start_at:`${selectedDate}T${start}:00`,
-end_at:`${selectedDate}T${end}:00`
+start_at:toUTC(selectedDate,start),
+end_at:toUTC(selectedDate,end)
 })
 })
 
@@ -471,7 +606,8 @@ formatDateTime,
 workingHoursText,
 timeMode,
 setTimeMode,
-TIMES
+TIMES:getTimes(timeMode),
+getTimes
 }
 
 }

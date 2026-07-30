@@ -1,4 +1,5 @@
 import Timeline from "./Timeline"
+import { getTimes } from "../hooks/useAppData"
 
 type Reservation={
 id:number
@@ -56,6 +57,8 @@ className={`status ${count?"reserved":"available"}`}
 roomId={room.id}
 reservations={reservations}
 selectedDate={selectedDate}
+timeMode={timeMode}
+times={getTimes(timeMode)}
 />
 
 <div className="desc">

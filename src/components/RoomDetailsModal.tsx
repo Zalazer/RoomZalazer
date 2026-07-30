@@ -19,23 +19,17 @@ room:Room
 reservations:Reservation[]
 selectedDate:string
 timeMode:"kyiv"|"local"
+times:string[]
 onClose:()=>void
 onCreate:()=>void
 }
-
-const TIMES=[
-"09:00","09:30","10:00","10:30",
-"11:00","11:30","12:00","12:30",
-"13:00","13:30","14:00","14:30",
-"15:00","15:30","16:00","16:30",
-"17:00","17:30","18:00","18:30"
-]
 
 export default function RoomDetailsModal({
 room,
 reservations,
 selectedDate,
 timeMode,
+times,
 onClose,
 onCreate
 }:Props){
@@ -69,12 +63,12 @@ return(
 Viewing in {timeMode==="kyiv"?"Kyiv time":"your local time"}
 </div>
 
-{TIMES.map(time=>{
+{times.map(time=>{
 
 const item=list.find(r=>{
 
-const start=r.start_at.slice(11,16)
-const end=r.end_at.slice(11,16)
+const start=fmt(r.start_at)
+const end=fmt(r.end_at)
 
 return time>=start&&time<end
 
