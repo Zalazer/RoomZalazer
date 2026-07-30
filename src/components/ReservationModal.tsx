@@ -82,7 +82,7 @@ timeMode==="kyiv"
 (a,b)=>a.start_at.localeCompare(b.start_at)
 )
 
-const startTimes=times.filter(t=>t!=="19:00")
+const startTimes=times.filter((_,i)=>i<times.length-1)
 
 const availableStartTimes=startTimes.filter(t=>{
 
@@ -113,7 +113,6 @@ const e=M(t)
 return(
 e>s&&
 e<=s+240&&
-e<=1140&&
 (nextBusy===undefined||e<=nextBusy)
 )
 
@@ -172,7 +171,6 @@ value={r.id}
 {r.name}
 </option>
 )}
-
 </select>
 
 <label>

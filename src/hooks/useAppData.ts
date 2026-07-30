@@ -52,6 +52,29 @@ for(let h=9;h<19;h++){
 return result
 }
 
+export const getOfficeBounds=(mode:"kyiv"|"local")=>{
+
+if(mode==="kyiv"){
+return{
+start:540,
+end:1140
+}
+}
+
+const today=kyivDate()
+
+const officeStart=new Date(`${today}T09:00:00+03:00`)
+const officeEnd=new Date(`${today}T19:00:00+03:00`)
+
+const toMinutes=(d:Date)=>
+d.getHours()*60+d.getMinutes()
+
+return{
+start:toMinutes(officeStart),
+end:toMinutes(officeEnd)
+}
+
+}
 
 
 const toUTC=(date:string,time:string)=>{
@@ -124,11 +147,15 @@ const nextSlot=(
     "en-CA"
    ).format(new Date())
 
- if(date!==today){
-  slot=540
- }
+ const office=getOfficeBounds(mode)
 
- if(slot<540)slot=540
+if(date!==today){
+ slot=office.start
+}
+
+if(slot<office.start){
+ slot=office.start
+}
 
  const busy=
  reservations
@@ -155,7 +182,7 @@ const nextSlot=(
 
  }))
 
- while(slot<1140){
+ while(slot<getOfficeBounds(mode).end){
 
   const clash=
    busy.find(
@@ -531,8 +558,10 @@ setReserveError("Maximum duration is 4 hours.")
 return
 }
 
-if(s<540||e>1140){
-setReserveError("Working hours are 09:00-19:00.")
+const office=getOfficeBounds(timeMode)
+
+if(s<office.start||e>office.end){
+setReserveError("Working hours are 09:00-19:00 Kyiv time.")
 return
 }
 
