@@ -231,6 +231,15 @@ const[password,setPassword]=useState("")
 const[name,setName]=useState("")
 const[registerMode,setRegisterMode]=useState(false)
 
+const[showProfileModal,setShowProfileModal]=useState(false)
+
+const[profileName,setProfileName]=useState("")
+const[profileEmail,setProfileEmail]=useState("")
+const[profilePassword,setProfilePassword]=useState("")
+
+const[profileError,setProfileError]=useState("")
+const[profileSuccess,setProfileSuccess]=useState("")
+
 const[reserveError,setReserveError]=useState("")
 const[loginError,setLoginError]=useState("")
 const[registerError,setRegisterError]=useState("")
@@ -361,6 +370,70 @@ await api("/auth/logout",{method:"POST"})
 localStorage.removeItem("token")
 setToken("")
 setUser(null)
+
+}
+
+
+function openProfile(){
+
+if(!user)return
+
+setProfileName(user.name)
+setProfileEmail(user.email)
+setProfilePassword("")
+setProfileError("")
+setProfileSuccess("")
+setShowProfileModal(true)
+
+}
+
+
+async function updateProfile(){
+
+setProfileError("")
+setProfileSuccess("")
+
+
+if(!profileName.trim()){
+setProfileError("Name required")
+return
+}
+
+
+if(profilePassword && profilePassword.length<8){
+setProfileError("Password must be 8-72 characters")
+return
+}
+
+
+const r=await api("/auth/profile",{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+name:profileName.trim(),
+email:profileEmail.trim(),
+password:profilePassword
+})
+})
+
+
+if(!r.ok){
+setProfileError(
+r.error||"Update failed"
+)
+return
+}
+
+
+setUser(r.user)
+
+setProfileSuccess(
+"Profile updated"
+)
+
+setProfilePassword("")
 
 }
 
@@ -598,6 +671,15 @@ isReserving,
 editing,
 currentReservations,pastReservations,
 login,register,logout,
+openProfile,
+showProfileModal,
+setShowProfileModal,
+profileName,setProfileName,
+profileEmail,setProfileEmail,
+profilePassword,setProfilePassword,
+profileError,
+profileSuccess,
+updateProfile,
 editReservation,
 deleteReservation,
 reserveRoom,

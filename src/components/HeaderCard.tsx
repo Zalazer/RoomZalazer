@@ -9,6 +9,7 @@ setTimeMode:(v:"kyiv"|"local")=>void
 workingHoursText:string
 user?:string
 onLogout?:()=>void
+onEdit?:()=>void
 onCurrent?:()=>void
 onPast?:()=>void
 }
@@ -24,6 +25,7 @@ setTimeMode,
 workingHoursText,
 user,
 onLogout,
+onEdit,
 onCurrent,
 onPast
 }:Props){
@@ -39,7 +41,24 @@ Smart Meeting Room Reservation Platform
 
 {user&&
 <div className="user-row">
+
 <span>{user}</span>
+
+<div style={{
+display:"flex",
+gap:"6px"
+}}>
+
+<button
+className="secondary"
+style={{
+padding:"4px 10px",
+fontSize:"12px"
+}}
+onClick={onEdit}
+>
+Edit
+</button>
 
 <button
 className="logout"
@@ -47,6 +66,9 @@ onClick={onLogout}
 >
 Logout
 </button>
+
+</div>
+
 </div>
 }
 
@@ -94,6 +116,7 @@ timeMode==="kyiv"
 </button>
 
 </div>
+
 </div>
 
 <div className="info">
@@ -101,21 +124,40 @@ timeMode==="kyiv"
 <span>{rooms}</span>
 </div>
 
-<div className="reservation-tabs">
+
+<div className="info">
+<span>My Reservations</span>
+
+<div
+style={{
+display:"flex",
+gap:"6px"
+}}
+>
 
 <button
 className="secondary"
+style={{
+padding:"4px 12px",
+fontSize:"12px"
+}}
 onClick={onCurrent}
 >
-Current ({current})
+Current {current}
 </button>
 
 <button
 className="secondary"
+style={{
+padding:"4px 12px",
+fontSize:"12px"
+}}
 onClick={onPast}
 >
-Past ({past})
+Past {past}
 </button>
+
+</div>
 
 </div>
 

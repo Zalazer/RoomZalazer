@@ -32,7 +32,8 @@ padding:14px
 
 .card,
 .room-card,
-.modal-content{
+.modal-content,
+.profile-modal-content{
 background:var(--card);
 border-radius:18px;
 padding:16px;
@@ -244,6 +245,26 @@ z-index:99
 .modal-content{
 width:100%;
 max-width:460px
+}
+
+.profile-modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.75);
+display:flex;
+justify-content:center;
+align-items:center;
+padding:20px;
+z-index:120
+}
+
+.profile-modal-content{
+width:100%;
+max-width:460px
+}
+
+.profile-modal-content input{
+margin-bottom:12px
 }
 
 .modal-buttons{

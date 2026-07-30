@@ -1,12 +1,13 @@
-import"./App.css"
-import HeaderCard from"./components/HeaderCard"
-import CalendarHeader from"./components/CalendarHeader"
-import WeekSelector from"./components/WeekSelector"
-import RoomCard from"./components/RoomCard"
-import RoomDetailsModal from"./components/RoomDetailsModal"
-import ReservationList from"./components/ReservationList"
-import ReservationModal from"./components/ReservationModal"
-import{useAppData}from"./hooks/useAppData"
+import "./App.css"
+import HeaderCard from "./components/HeaderCard"
+import CalendarHeader from "./components/CalendarHeader"
+import WeekSelector from "./components/WeekSelector"
+import RoomCard from "./components/RoomCard"
+import RoomDetailsModal from "./components/RoomDetailsModal"
+import ReservationList from "./components/ReservationList"
+import ReservationModal from "./components/ReservationModal"
+import ProfileModal from "./components/ProfileModal"
+import {useAppData} from "./hooks/useAppData"
 
 export default function App(){
 
@@ -17,19 +18,55 @@ return(
 <div className="container">
 <div className="card">
 <h1>RoomZalazer</h1>
-<input placeholder="Email" value={a.email} onChange={e=>a.setEmail(e.target.value)}/>
+
+<input
+placeholder="Email"
+value={a.email}
+onChange={e=>a.setEmail(e.target.value)}
+/>
+
 {a.loginError&&<div className="error">{a.loginError}</div>}
-<input type="password" placeholder="Password" value={a.password} onChange={e=>a.setPassword(e.target.value)}/>
-{a.registerMode&&<input placeholder="Name" value={a.name} onChange={e=>a.setName(e.target.value)}/>}
-{a.registerError&&<div className="error">{a.registerError}</div>}
-<button className="primary" onClick={a.registerMode?a.register:a.login}>{a.registerMode?"Register":"Login"}</button>
-<button className="secondary" onClick={()=>a.setRegisterMode(!a.registerMode)}>{a.registerMode?"Back to Login":"Create Account"}</button>
+
+<input
+type="password"
+placeholder="Password"
+value={a.password}
+onChange={e=>a.setPassword(e.target.value)}
+/>
+
+{a.registerMode&&
+<input
+placeholder="Name"
+value={a.name}
+onChange={e=>a.setName(e.target.value)}
+/>
+}
+
+{a.registerError&&
+<div className="error">{a.registerError}</div>
+}
+
+<button
+className="primary"
+onClick={a.registerMode?a.register:a.login}
+>
+{a.registerMode?"Register":"Login"}
+</button>
+
+<button
+className="secondary"
+onClick={()=>a.setRegisterMode(!a.registerMode)}
+>
+{a.registerMode?"Back to Login":"Create Account"}
+</button>
+
 </div>
 </div>
 )
 
 return(
 <>
+
 <div className="container">
 
 <HeaderCard
@@ -43,6 +80,7 @@ rooms={a.rooms.length}
 current={a.currentReservations.length}
 past={a.pastReservations.length}
 onLogout={a.logout}
+onEdit={a.openProfile}
 onCurrent={()=>{
 a.setShowCurrent(!a.showCurrent)
 a.setShowPast(false)
@@ -113,7 +151,10 @@ RoomZalazer • Google Calendar Style
 
 </div>
 
-<button className="float" onClick={()=>a.setShowModal(true)}>
+<button
+className="float"
+onClick={()=>a.setShowModal(true)}
+>
 +
 </button>
 
@@ -137,6 +178,20 @@ onClose={()=>a.setShowModal(false)}
 editing={a.editing}
 error={a.reserveError}
 loading={a.isReserving}
+/>
+
+<ProfileModal
+show={a.showProfileModal}
+name={a.profileName}
+setName={a.setProfileName}
+email={a.profileEmail}
+setEmail={a.setProfileEmail}
+password={a.profilePassword}
+setPassword={a.setProfilePassword}
+error={a.profileError}
+success={a.profileSuccess}
+onSave={a.updateProfile}
+onClose={()=>a.setShowProfileModal(false)}
 />
 
 {a.selectedRoom&&
