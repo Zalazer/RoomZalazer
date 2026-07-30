@@ -20,6 +20,7 @@ reservations:Reservation[]
 selectedDate:string
 timeMode:"kyiv"|"local"
 onClose:()=>void
+onCreate:()=>void
 }
 
 const TIMES=[
@@ -35,7 +36,8 @@ room,
 reservations,
 selectedDate,
 timeMode,
-onClose
+onClose,
+onCreate
 }:Props){
 
 const list=reservations.filter(
@@ -91,7 +93,7 @@ color:item?"#ffc0c0":"#97ffbd"
 
 <span>
 {item
-?`${fmt(item.start_at)}-${fmt(item.end_at)} ${item.title}`
+?`${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name??"Reserved"}`
 :"FREE"}
 </span>
 
@@ -101,9 +103,21 @@ color:item?"#ffc0c0":"#97ffbd"
 })}
 
 <div className="modal-buttons">
-<button className="secondary" onClick={onClose}>
+
+<button
+className="secondary"
+onClick={onClose}
+>
 Close
 </button>
+
+<button
+className="primary"
+onClick={onCreate}
+>
+Create Reservation
+</button>
+
 </div>
 
 </div>

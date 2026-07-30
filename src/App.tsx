@@ -22,12 +22,8 @@ return(
 <input type="password" placeholder="Password" value={a.password} onChange={e=>a.setPassword(e.target.value)}/>
 {a.registerMode&&<input placeholder="Name" value={a.name} onChange={e=>a.setName(e.target.value)}/>}
 {a.registerError&&<div className="error">{a.registerError}</div>}
-<button className="primary" onClick={a.registerMode?a.register:a.login}>
-{a.registerMode?"Register":"Login"}
-</button>
-<button className="secondary" onClick={()=>a.setRegisterMode(!a.registerMode)}>
-{a.registerMode?"Back to Login":"Create Account"}
-</button>
+<button className="primary" onClick={a.registerMode?a.register:a.login}>{a.registerMode?"Register":"Login"}</button>
+<button className="secondary" onClick={()=>a.setRegisterMode(!a.registerMode)}>{a.registerMode?"Back to Login":"Create Account"}</button>
 </div>
 </div>
 )
@@ -140,6 +136,7 @@ reservations={a.reservations}
 selectedDate={a.selectedDate}
 timeMode={a.timeMode}
 onClose={()=>a.setSelectedRoom(null)}
+onCreate={()=>a.setShowModal(true)}
 />
 }
 
