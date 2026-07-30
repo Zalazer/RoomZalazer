@@ -12,11 +12,20 @@ status?:string
 type Props={
 title:string
 reservations:Reservation[]
+timeMode:"kyiv"|"local"
+formatDateTime:(v:string)=>string
 onDelete:(id:number)=>void
 onEdit:(id:number)=>void
 }
 
-export default function ReservationList({title,reservations,onDelete,onEdit}:Props){
+export default function ReservationList({
+title,
+reservations,
+timeMode,
+formatDateTime,
+onDelete,
+onEdit
+}:Props){
 
 const list=[...reservations].sort((a,b)=>{
 const ac=a.status==="cancelled"
@@ -26,17 +35,26 @@ if(!ac&&bc)return-1
 return new Date(a.start_at).getTime()-new Date(b.start_at).getTime()
 })
 
-const day=(v:string)=>new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(v))
-const time=(v:string)=>new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(v))
-const mins=(a:string,b:string)=>(new Date(b).getTime()-new Date(a).getTime())/60000
+const mins=(a:string,b:string)=>
+(new Date(b).getTime()-new Date(a).getTime())/60000
+
+const t=(v:string)=>
+formatDateTime(v).split(", ").pop()||""
 
 return(
 <div className="card">
+
 <h2>{title}</h2>
+
+<div className="small" style={{marginBottom:"10px"}}>
+Viewing in {timeMode==="kyiv"?"Kyiv time":"your local time"}
+</div>
 
 {!list.length?
 
-<div className="small">No reservations.</div>
+<div className="small">
+No reservations.
+</div>
 
 :
 
@@ -45,10 +63,12 @@ list.map(r=>(
 <div key={r.id} className="reservation">
 
 <div className="title">
-{day(r.start_at)} {time(r.start_at)} - {time(r.end_at)} ({mins(r.start_at,r.end_at)} min)
+{formatDateTime(r.start_at)} - {t(r.end_at)} ({mins(r.start_at,r.end_at)} min)
 </div>
 
-<div>{r.title}</div>
+<div>
+{r.title}
+</div>
 
 <div className="small">
 {r.room_name??`Room #${r.room_id}`} • {r.room_capacity??"?"} seats&nbsp;&nbsp;&nbsp;Status: {r.status??"reserved"}
@@ -56,8 +76,19 @@ list.map(r=>(
 
 {r.status!=="cancelled"&&
 <div className="actions">
-<button className="secondary" onClick={()=>onEdit(r.id)}>Edit</button>
-<button className="secondary" onClick={()=>onDelete(r.id)}>Cancel</button>
+<button
+className="secondary"
+onClick={()=>onEdit(r.id)}
+>
+Edit
+</button>
+
+<button
+className="secondary"
+onClick={()=>onDelete(r.id)}
+>
+Cancel
+</button>
 </div>
 }
 

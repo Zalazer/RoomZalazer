@@ -1,18 +1,21 @@
 type Props={
 selectedDate:string
+formatDate:(v:string)=>string
 }
 
 export default function CalendarHeader({
-selectedDate
+selectedDate,
+formatDate
 }:Props){
-
-const d=new Date(selectedDate)
 
 return(
 <div className="card" style={{textAlign:"center"}}>
+
 <h2 style={{fontSize:"18px",margin:0}}>
-Schedule for {d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
+Schedule for {formatDate(selectedDate)}
 </h2>
+
 </div>
 )
+
 }

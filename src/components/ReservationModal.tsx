@@ -7,6 +7,7 @@ rooms:Room[]
 times:string[]
 reservations:Reservation[]
 selectedDate:string
+timeMode:"kyiv"|"local"
 title:string
 setTitle:(v:string)=>void
 roomId:string
@@ -28,6 +29,7 @@ rooms,
 times,
 reservations,
 selectedDate,
+timeMode,
 title,
 setTitle,
 roomId,
@@ -107,6 +109,10 @@ return(
 {selectedDate}
 </div>
 
+<div className="small" style={{marginBottom:"10px"}}>
+Working in {timeMode==="kyiv"?"Kyiv time":"your local time"}
+</div>
+
 <label>
 Meeting title
 </label>
@@ -155,7 +161,6 @@ Start time
 value={start}
 onChange={e=>setStart(e.target.value)}
 >
-
 {availableStartTimes.map(t=>
 <option
 key={t}
@@ -164,7 +169,6 @@ value={t}
 {t}
 </option>
 )}
-
 </select>
 
 <label>
@@ -175,7 +179,6 @@ End time
 value={end}
 onChange={e=>setEnd(e.target.value)}
 >
-
 {availableEndTimes.map(t=>
 <option
 key={t}
@@ -184,7 +187,6 @@ value={t}
 {t}
 </option>
 )}
-
 </select>
 
 <div className="modal-buttons">
@@ -199,7 +201,11 @@ loading||
 }
 onClick={onReserve}
 >
-{loading?"Reserving...":editing?"Save Changes":"Reserve"}
+{loading
+?"Reserving..."
+:editing
+?"Save Changes"
+:"Reserve"}
 </button>
 
 <button

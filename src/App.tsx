@@ -40,6 +40,9 @@ return(
 user={a.user?.name}
 time={a.time}
 localTime={a.localTime}
+timeMode={a.timeMode}
+setTimeMode={a.setTimeMode}
+workingHoursText={a.workingHoursText}
 rooms={a.rooms.length}
 current={a.currentReservations.length}
 past={a.pastReservations.length}
@@ -58,6 +61,8 @@ a.setShowCurrent(false)
 <ReservationList
 title="Current Reservations"
 reservations={a.currentReservations}
+timeMode={a.timeMode}
+formatDateTime={a.formatDateTime}
 onDelete={a.deleteReservation}
 onEdit={a.editReservation}
 />
@@ -67,16 +72,22 @@ onEdit={a.editReservation}
 <ReservationList
 title="Past Reservations"
 reservations={a.pastReservations}
+timeMode={a.timeMode}
+formatDateTime={a.formatDateTime}
 onDelete={a.deleteReservation}
 onEdit={a.editReservation}
 />
 }
 
-<CalendarHeader selectedDate={a.selectedDate}/>
+<CalendarHeader
+selectedDate={a.selectedDate}
+formatDate={a.formatDate}
+/>
 
 <WeekSelector
 selectedDate={a.selectedDate}
 setSelectedDate={a.setSelectedDate}
+formatDate={a.formatDate}
 />
 
 {a.rooms.map(room=>
@@ -85,6 +96,7 @@ key={room.id}
 room={room}
 reservations={a.reservations}
 selectedDate={a.selectedDate}
+timeMode={a.timeMode}
 onClick={()=>a.setSelectedRoom(room)}
 />
 )}
@@ -105,6 +117,7 @@ rooms={a.rooms}
 times={a.TIMES}
 reservations={a.reservations}
 selectedDate={a.selectedDate}
+timeMode={a.timeMode}
 title={a.title}
 setTitle={a.setTitle}
 roomId={a.roomId}
@@ -125,6 +138,7 @@ loading={a.isReserving}
 room={a.selectedRoom}
 reservations={a.reservations}
 selectedDate={a.selectedDate}
+timeMode={a.timeMode}
 onClose={()=>a.setSelectedRoom(null)}
 />
 }

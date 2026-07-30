@@ -18,6 +18,7 @@ type Props={
 room:Room
 reservations:Reservation[]
 selectedDate:string
+timeMode:"kyiv"|"local"
 onClose:()=>void
 }
 
@@ -33,12 +34,26 @@ export default function RoomDetailsModal({
 room,
 reservations,
 selectedDate,
+timeMode,
 onClose
 }:Props){
 
 const list=reservations.filter(
 r=>r.room_id===room.id&&r.start_at.slice(0,10)===selectedDate
 )
+
+const fmt=(v:string)=>
+new Intl.DateTimeFormat(
+"en-GB",
+{
+hour:"2-digit",
+minute:"2-digit",
+hour12:false,
+timeZone:timeMode==="kyiv"
+?"Europe/Kyiv"
+:undefined
+}
+).format(new Date(v))
 
 return(
 <div className="modal">
@@ -47,6 +62,10 @@ return(
 <h2 style={{marginBottom:"10px"}}>
 {room.name} • Capacity: {room.capacity}
 </h2>
+
+<div className="small" style={{marginBottom:"12px"}}>
+Viewing in {timeMode==="kyiv"?"Kyiv time":"your local time"}
+</div>
 
 {TIMES.map(time=>{
 
@@ -67,11 +86,12 @@ style={{
 color:item?"#ffc0c0":"#97ffbd"
 }}
 >
+
 <span>{time}</span>
 
 <span>
 {item
-?`${item.start_at.slice(11,16)}-${item.end_at.slice(11,16)} ${item.title}`
+?`${fmt(item.start_at)}-${fmt(item.end_at)} ${item.title}`
 :"FREE"}
 </span>
 

@@ -54,6 +54,10 @@ const[time,setTime]=useState("")
 const[localTime,setLocalTime]=useState("")
 
 const[selectedDate,setSelectedDate]=useState(kyivDate())
+
+const[timeMode,setTimeMode]=useState<"kyiv"|"local">(localStorage.getItem("timeMode")==="local"?"local":"kyiv")
+useEffect(()=>localStorage.setItem("timeMode",timeMode),[timeMode])
+
 const[selectedRoom,setSelectedRoom]=useState<Room|null>(null)
 
 const[showModal,_setShowModal]=useState(false)
@@ -94,19 +98,28 @@ const[editing,setEditing]=useState(false)
 
 useEffect(()=>{
 
+const update=()=>{
 setTime(kyivTime())
 setLocalTime(new Date().toLocaleString("en-GB"))
+}
 
-const t=setInterval(()=>{
-setTime(kyivTime())
-setLocalTime(new Date().toLocaleString("en-GB"))
-},1000)
+update()
+
+const t=setInterval(update,1000)
 
 if(token)loadAll()
 
 return()=>clearInterval(t)
 
 },[token])
+
+useEffect(()=>{
+if(timeMode==="kyiv"){
+setSelectedDate(kyivDate())
+}else{
+setSelectedDate(new Date().toISOString().slice(0,10))
+}
+},[timeMode])
 
 async function api(path:string,options:any={}){
 
@@ -349,6 +362,72 @@ const currentReservations=myReservations.filter(r=>r.status!=="cancelled"&&new D
 
 const pastReservations=myReservations.filter(r=>r.status==="cancelled"||new Date(r.end_at)<=new Date())
 
+const formatDate=(v:string)=>
+new Intl.DateTimeFormat(
+"en-GB",
+{
+timeZone:timeMode==="kyiv"
+?"Europe/Kyiv"
+:undefined,
+weekday:"long",
+day:"numeric",
+month:"long",
+year:"numeric"
+}
+).format(new Date(`${v}T00:00:00`))
+
+
+const formatDateTime=(v:string)=>
+new Intl.DateTimeFormat(
+"en-GB",
+{
+timeZone:timeMode==="kyiv"
+?"Europe/Kyiv"
+:undefined,
+weekday:"short",
+day:"2-digit",
+month:"2-digit",
+year:"numeric",
+hour:"2-digit",
+minute:"2-digit",
+hour12:false
+}
+).format(new Date(v))
+
+const workingHoursText=(()=>{
+
+if(timeMode==="kyiv"){
+return"09:00 - 19:00 (Kyiv)"
+}
+
+const today=kyivDate()
+
+const start=new Date(`${today}T09:00:00+03:00`)
+const end=new Date(`${today}T19:00:00+03:00`)
+
+const s=new Intl.DateTimeFormat(
+"en-GB",
+{
+hour:"2-digit",
+minute:"2-digit",
+hour12:false
+}
+).format(start)
+
+const e=new Intl.DateTimeFormat(
+"en-GB",
+{
+hour:"2-digit",
+minute:"2-digit",
+hour12:false
+}
+).format(end)
+
+return`${s} - ${e} (Your local time)`
+
+})()
+
+
 return{
 token,user,rooms,reservations,
 showCurrent,setShowCurrent,
@@ -373,6 +452,11 @@ login,register,logout,
 editReservation,
 deleteReservation,
 reserveRoom,
+formatDate,
+formatDateTime,
+workingHoursText,
+timeMode,
+setTimeMode,
 TIMES
 }
 

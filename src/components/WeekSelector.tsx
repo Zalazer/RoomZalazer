@@ -1,6 +1,7 @@
 type Props={
 selectedDate:string
 setSelectedDate:(v:string)=>void
+formatDate:(v:string)=>string
 }
 
 export default function WeekSelector({
@@ -8,7 +9,7 @@ selectedDate,
 setSelectedDate
 }:Props){
 
-const current=new Date(selectedDate)
+const current=new Date(`${selectedDate}T00:00:00`)
 
 function add(days:number){
 const d=new Date(current)
@@ -38,11 +39,25 @@ const value=d.toISOString().slice(0,10)
 return(
 <button
 key={value}
-style={{padding:"10px 8px",fontSize:"15px",minWidth:"58px"}}
+style={{
+padding:"8px",
+fontSize:"14px",
+minWidth:"58px",
+lineHeight:"1.2",
+display:"flex",
+flexDirection:"column",
+alignItems:"center"
+}}
 className={value===selectedDate?"primary":"secondary"}
 onClick={()=>setSelectedDate(value)}
 >
-{d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric"})}
+<span>
+{d.toLocaleDateString("en-GB",{weekday:"short"})}
+</span>
+
+<span>
+{d.toLocaleDateString("en-GB",{day:"2-digit"})}
+</span>
 </button>
 )
 
@@ -52,4 +67,3 @@ onClick={()=>setSelectedDate(value)}
 </div>
 )
 }
-

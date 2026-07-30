@@ -4,6 +4,9 @@ localTime:string
 rooms:number
 current:number
 past:number
+timeMode:"kyiv"|"local"
+setTimeMode:(v:"kyiv"|"local")=>void
+workingHoursText:string
 user?:string
 onLogout?:()=>void
 onCurrent?:()=>void
@@ -16,6 +19,9 @@ localTime,
 rooms,
 current,
 past,
+timeMode,
+setTimeMode,
+workingHoursText,
 user,
 onLogout,
 onCurrent,
@@ -56,7 +62,30 @@ Logout
 
 <div className="info">
 <span>Working Hours</span>
-<span>09:00 - 19:00 (Kyiv)</span>
+<span>{workingHoursText}</span>
+</div>
+
+<div
+style={{
+display:"flex",
+gap:"8px",
+marginTop:"10px",
+marginBottom:"10px"
+}}
+>
+<button
+className={timeMode==="kyiv"?"primary":"secondary"}
+onClick={()=>setTimeMode("kyiv")}
+>
+Kyiv Time
+</button>
+
+<button
+className={timeMode==="local"?"primary":"secondary"}
+onClick={()=>setTimeMode("local")}
+>
+Local Time
+</button>
 </div>
 
 <div className="info">
