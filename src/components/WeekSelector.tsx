@@ -12,61 +12,81 @@ setSelectedDate
 const current=new Date(`${selectedDate}T00:00:00`)
 
 const localDate=(d:Date)=>{
-
 const y=d.getFullYear()
 const m=String(d.getMonth()+1).padStart(2,"0")
 const day=String(d.getDate()).padStart(2,"0")
-
-return `${y}-${m}-${day}`
-
+return`${y}-${m}-${day}`
 }
 
+function addWeek(days:number){
+const d=new Date(current)
+d.setDate(d.getDate()+days)
+setSelectedDate(localDate(d))
+}
 
-function add(days:number){
+function changeMonth(dir:-1|1){
 
 const d=new Date(current)
 
-d.setDate(
-d.getDate()+days
-)
+const day=d.getDate()
 
-setSelectedDate(
-localDate(d)
-)
+d.setMonth(d.getMonth()+dir)
+
+const maxDay=new Date(
+d.getFullYear(),
+d.getMonth()+1,
+0
+).getDate()
+
+d.setDate(Math.min(day,maxDay))
+
+setSelectedDate(localDate(d))
 
 }
 
-
 const today=localDate(new Date())
-
 
 return(
 <div className="card">
 
-<div style={{
+<div
+style={{
 display:"flex",
-gap:"8px",
+gap:"4px",
 marginBottom:"12px",
 justifyContent:"center",
-flexWrap:"wrap"
-}}>
+flexWrap:"nowrap"
+}}
+>
 
 <button
 className="secondary"
-onClick={()=>add(-30)}
+style={{
+padding:"8px 10px",
+fontSize:"14px"
+}}
+onClick={()=>changeMonth(-1)}
 >
-{"<<"}
+{"<< M"}
 </button>
 
 <button
 className="secondary"
-onClick={()=>add(-7)}
+style={{
+padding:"8px 10px",
+fontSize:"14px"
+}}
+onClick={()=>addWeek(-7)}
 >
-{"<"}
+{"< W"}
 </button>
 
 <button
 className="primary"
+style={{
+padding:"8px 10px",
+fontSize:"14px"
+}}
 onClick={()=>setSelectedDate(today)}
 >
 Today
@@ -74,66 +94,77 @@ Today
 
 <button
 className="secondary"
-onClick={()=>add(7)}
+style={{
+padding:"8px 10px",
+fontSize:"14px"
+}}
+onClick={()=>addWeek(7)}
 >
-{">"}
+{"W >"}
 </button>
 
 <button
 className="secondary"
-onClick={()=>add(30)}
+style={{
+padding:"8px 10px",
+fontSize:"14px"
+}}
+onClick={()=>changeMonth(1)}
 >
-{">>"}
+{"M >>"}
 </button>
 
 </div>
 
-
-<div style={{
+<div
+style={{
 display:"flex",
-gap:"6px",
-justifyContent:"center"
-}}>
+gap:"4px",
+justifyContent:"center",
+flexWrap:"nowrap"
+}}
+>
 
-{[0,1,2,3,4].map(i=>{
+{[0,1,2,3,4,5,6].map(i=>{
 
-const d=new Date(current)
+const weekStart=new Date(current)
 
-const monday=new Date(current)
-
-monday.setDate(
+weekStart.setDate(
 current.getDate()-
 ((current.getDay()+6)%7)
 )
 
-d.setTime(
-monday.getTime()
-)
+const d=new Date(weekStart)
 
-d.setDate(
-monday.getDate()+i
-)
+d.setDate(weekStart.getDate()+i)
 
 const value=localDate(d)
-
 
 return(
 <button
 key={value}
-style={{
-padding:"8px",
-fontSize:"14px",
-minWidth:"58px",
-lineHeight:"1.2",
-display:"flex",
-flexDirection:"column",
-alignItems:"center"
-}}
 className={
 value===selectedDate
 ?"primary"
 :"secondary"
 }
+style={{
+padding:"6px",
+fontSize:"12px",
+minWidth:"44px",
+lineHeight:"1.1",
+display:"flex",
+flexDirection:"column",
+alignItems:"center",
+flex:1,
+opacity:i>=5?0.85:1,
+background:
+value===selectedDate
+?undefined
+:i>=5
+?"rgba(255,87,87,.15)"
+:undefined
+}}
 onClick={()=>setSelectedDate(value)}
 >
 
