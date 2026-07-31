@@ -10,16 +10,14 @@ formatDate
 
 return(
 <div className="card" style={{textAlign:"center"}}>
-
 <h2
 style={{
-fontSize:"20px",
+fontSize:"16px",
 margin:0
 }}
 >
-{formatDate(selectedDate)}
+Schedule for {formatDate(selectedDate)}
 </h2>
-
 </div>
 )
 
