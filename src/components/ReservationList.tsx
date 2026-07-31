@@ -1,164 +1,198 @@
 type Reservation={
-id:number
-room_id:number
-room_name?:string
-room_capacity?:number
-title:string
-start_at:string
-end_at:string
-status?:string
+  id:number
+  room_id:number
+  room_name?:string
+  room_capacity?:number
+  room_floor?:number
+  title:string
+  start_at:string
+  end_at:string
+  status?:string
 }
 
 type Props={
-title:string
-reservations:Reservation[]
-timeMode:"kyiv"|"local"
-formatDateTime:(v:string)=>string
-onDelete:(id:number)=>void
-onEdit:(id:number)=>void
-onOpenPast?:(r:Reservation)=>void
+  title:string
+  reservations:Reservation[]
+  timeMode:"kyiv"|"local"
+  formatDateTime:(v:string)=>string
+  onDelete:(id:number)=>void
+  onEdit:(id:number)=>void
+  onOpenPast?:(r:Reservation)=>void
 }
 
 export default function ReservationList({
-title,
-reservations,
-timeMode,
-formatDateTime,
-onDelete,
-onEdit,
-onOpenPast
+  title,
+  reservations,
+  timeMode,
+  formatDateTime,
+  onDelete,
+  onEdit,
+  onOpenPast
 }:Props){
 
-const now=Date.now()
+  const now=Date.now()
 
-const list=[...reservations].sort((a,b)=>{
-const ac=a.status==="cancelled"
-const bc=b.status==="cancelled"
+  const list=[...reservations].sort((a,b)=>{
+    const ac=a.status==="cancelled"
+    const bc=b.status==="cancelled"
 
-if(ac&&!bc)return 1
-if(!ac&&bc)return-1
+    if(ac&&!bc)return 1
+    if(!ac&&bc)return -1
 
-return new Date(a.start_at).getTime()-new Date(b.start_at).getTime()
-})
+    return (
+      new Date(a.start_at).getTime()-
+      new Date(b.start_at).getTime()
+    )
+  })
 
-const mins=(a:string,b:string)=>
-(new Date(b).getTime()-new Date(a).getTime())/60000
+  const mins=(a:string,b:string)=>
+    (new Date(b).getTime()-new Date(a).getTime())/60000
 
-const t=(v:string)=>
-formatDateTime(v).split(", ").pop()||""
+  const t=(v:string)=>
+    formatDateTime(v).split(", ").pop()||""
 
-return(
-<div className="card">
+  const floorSuffix=(floor?:number)=>{
+    if(!floor)return "th"
 
-<h2>
-{title}
-{title.toLowerCase().includes("past")&&
-<span className="small">
-&nbsp;(Tap to view)
-</span>
-}
-</h2>
+    if(floor===1)return "st"
+    if(floor===2)return "nd"
+    if(floor===3)return "rd"
 
-<div className="small" style={{marginBottom:"10px"}}>
-Viewing in {timeMode==="kyiv"?"Kyiv time":"your local time"}
-</div>
+    return "th"
+  }
 
-{!list.length?
+  return(
+    <div className="card">
 
-<div className="small">
-No reservations.
-</div>
+      <h2>
+        {title}
+        {title.toLowerCase().includes("past")&&
+          <span className="small">
+            &nbsp;(Tap to view)
+          </span>
+        }
+      </h2>
 
-:
+      <div
+        className="small"
+        style={{marginBottom:"10px"}}
+      >
+        Viewing in {
+          timeMode==="kyiv"
+            ?"Kyiv time"
+            :"your local time"
+        }
+      </div>
 
-list.map(r=>{
+      {!list.length?
 
-const finished=
-r.status!=="cancelled"&&
-new Date(r.end_at).getTime()<now
+        <div className="small">
+          No reservations.
+        </div>
 
-const displayStatus=
-r.status==="cancelled"
-?"cancelled"
-:finished
-?"finished"
-:"reserved"
+        :
 
-const clickable=
-displayStatus==="finished"||displayStatus==="cancelled"
+        list.map(r=>{
 
-return(
+          const finished=
+            r.status!=="cancelled"&&
+            new Date(r.end_at).getTime()<now
 
-<div
-key={r.id}
-className="reservation"
-style={{
-background:
-displayStatus==="finished"
-?"rgba(255,255,255,.05)"
-:displayStatus==="cancelled"
-?"rgba(255,80,80,.06)"
-:undefined,
-cursor:
-clickable
-?"pointer"
-:"default",
-marginBottom:"6px"
-}}
-onClick={()=>{
-if(clickable){
-onOpenPast?.(r)
-}
-}}
->
+          const displayStatus=
+            r.status==="cancelled"
+              ?"cancelled"
+              :finished
+                ?"finished"
+                :"reserved"
 
-<div className="title">
-{formatDateTime(r.start_at)} - {t(r.end_at)} ({mins(r.start_at,r.end_at)} min)
-</div>
+          const clickable=
+            displayStatus==="finished"||
+            displayStatus==="cancelled"
 
-<div>
-{r.title}
-</div>
+          return(
 
-<div className="small">
-{r.room_name??`Room #${r.room_id}`} • {r.room_capacity??"?"} seats&nbsp;&nbsp;&nbsp;Status: {displayStatus}
-</div>
+            <div
+              key={r.id}
+              className="reservation"
+              style={{
+                background:
+                  displayStatus==="finished"
+                    ?"rgba(255,255,255,.05)"
+                    :displayStatus==="cancelled"
+                      ?"rgba(255,80,80,.06)"
+                      :undefined,
+                cursor:
+                  clickable
+                    ?"pointer"
+                    :"default",
+                marginBottom:"6px"
+              }}
+              onClick={()=>{
+                if(clickable){
+                  onOpenPast?.(r)
+                }
+              }}
+            >
 
-{displayStatus==="reserved"&&
-<div className="actions">
+              <div className="title">
+                {formatDateTime(r.start_at)}
+                {" - "}
+                {t(r.end_at)}
+                {" ("}
+                {mins(r.start_at,r.end_at)}
+                {" min)"}
+              </div>
 
-<button
-className="secondary"
-onClick={e=>{
-e.stopPropagation()
-onEdit(r.id)
-}}
->
-Edit
-</button>
+              <div>
+                {r.title}
+              </div>
 
-<button
-className="secondary"
-onClick={e=>{
-e.stopPropagation()
-onDelete(r.id)
-}}
->
-Cancel
-</button>
+              <div className="small">
+                {r.room_name??`Room #${r.room_id}`}
+                {" · "}
+                {r.room_floor??"?"}
+                {floorSuffix(r.room_floor)}
+                {" floor"}
+                {" · Capacity "}
+                {r.room_capacity??"?"}
+                {"   Status: "}
+                {displayStatus}
+              </div>
 
-</div>
-}
+              {displayStatus==="reserved"&&
+                <div className="actions">
 
-</div>
+                  <button
+                    className="secondary"
+                    onClick={e=>{
+                      e.stopPropagation()
+                      onEdit(r.id)
+                    }}
+                  >
+                    Edit
+                  </button>
 
-)
+                  <button
+                    className="secondary"
+                    onClick={e=>{
+                      e.stopPropagation()
+                      onDelete(r.id)
+                    }}
+                  >
+                    Cancel
+                  </button>
 
-})
+                </div>
+              }
 
-}
+            </div>
 
-</div>
-)
+          )
 
+        })
+
+      }
+
+    </div>
+  )
 }

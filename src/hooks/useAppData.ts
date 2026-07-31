@@ -103,7 +103,14 @@ mode==="kyiv"
 
 
 export type User={id:string,name:string,email:string}
-export type Room={id:number,name:string,capacity:number,description:string}
+
+export type Room={
+id:number
+name:string
+capacity:number
+description:string
+floor:number
+}
 
 export type Reservation={
 id:number
@@ -114,6 +121,7 @@ end_at:string
 user_name?:string
 room_name?:string
 room_capacity?:number
+room_floor?:number
 status?:string
 }
 
@@ -202,7 +210,7 @@ if(slot<office.start){
   slot=clash.e
  }
 
- return TIMES[TIMES.length-1]
+ return getTimes(mode).at(-1) ?? "18:30"
 }
 
 export function useAppData(){

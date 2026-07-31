@@ -1,245 +1,314 @@
-type Room={id:number,name:string}
-type Reservation={id:number,room_id:number,start_at:string,end_at:string}
+type Room={
+  id:number
+  name:string
+  capacity:number
+  floor:number
+}
+
+type Reservation={
+  id:number
+  room_id:number
+  start_at:string
+  end_at:string
+}
 
 type Props={
-show:boolean
-rooms:Room[]
-times:string[]
-reservations:Reservation[]
-selectedDate:string
-timeMode:"kyiv"|"local"
-title:string
-setTitle:(v:string)=>void
-roomId:string
-setRoomId:(v:string)=>void
-start:string
-setStart:(v:string)=>void
-end:string
-setEnd:(v:string)=>void
-onReserve:()=>void
-onClose:()=>void
-editing?:boolean
-error?:string
-loading?:boolean
+  show:boolean
+  rooms:Room[]
+  times:string[]
+  reservations:Reservation[]
+  selectedDate:string
+  timeMode:"kyiv"|"local"
+  title:string
+  setTitle:(v:string)=>void
+  roomId:string
+  setRoomId:(v:string)=>void
+  start:string
+  setStart:(v:string)=>void
+  end:string
+  setEnd:(v:string)=>void
+  onReserve:()=>void
+  onClose:()=>void
+  editing?:boolean
+  error?:string
+  loading?:boolean
 }
 
 export default function ReservationModal({
-show,
-rooms,
-times,
-reservations,
-selectedDate,
-timeMode,
-title,
-setTitle,
-roomId,
-setRoomId,
-start,
-setStart,
-end,
-setEnd,
-onReserve,
-onClose,
-editing=false,
-error="",
-loading=false
+  show,
+  rooms,
+  times,
+  reservations,
+  selectedDate,
+  timeMode,
+  title,
+  setTitle,
+  roomId,
+  setRoomId,
+  start,
+  setStart,
+  end,
+  setEnd,
+  onReserve,
+  onClose,
+  editing=false,
+  error="",
+  loading=false
 }:Props){
 
-if(!show)return null
+  if(!show)return null
 
-const M=(v:string)=>Number(v.slice(0,2))*60+Number(v.slice(3,5))
+  const M=(v:string)=>
+    Number(v.slice(0,2))*60+
+    Number(v.slice(3,5))
 
-const fmt=(v:string)=>
-new Intl.DateTimeFormat(
-"en-GB",
-{
-hour:"2-digit",
-minute:"2-digit",
-hour12:false,
-timeZone:
-timeMode==="kyiv"
-?"Europe/Kyiv"
-:undefined
-}
-).format(new Date(v))
+  const floorText=(n:number)=>
+    `${n}${
+      n===1
+        ?"st"
+        :n===2
+        ?"nd"
+        :n===3
+        ?"rd"
+        :"th"
+    } floor`
 
-const roomReservations=
-reservations
-.filter(
-r=>
-r.room_id===Number(roomId)&&
-new Intl.DateTimeFormat(
-"en-CA",
-{
-timeZone:
-timeMode==="kyiv"
-?"Europe/Kyiv"
-:undefined
-}
-).format(new Date(r.start_at))===selectedDate
-)
-.sort(
-(a,b)=>a.start_at.localeCompare(b.start_at)
-)
+  const fmt=(v:string)=>
+    new Intl.DateTimeFormat(
+      "en-GB",
+      {
+        hour:"2-digit",
+        minute:"2-digit",
+        hour12:false,
+        timeZone:
+          timeMode==="kyiv"
+            ?"Europe/Kyiv"
+            :undefined
+      }
+    ).format(new Date(v))
 
-const startTimes=times.filter((_,i)=>i<times.length-1)
+  const roomReservations=
+    reservations
+      .filter(
+        r=>
+          r.room_id===Number(roomId)&&
+          new Intl.DateTimeFormat(
+            "en-CA",
+            {
+              timeZone:
+                timeMode==="kyiv"
+                  ?"Europe/Kyiv"
+                  :undefined
+            }
+          ).format(new Date(r.start_at))===selectedDate
+      )
+      .sort(
+        (a,b)=>
+          a.start_at.localeCompare(
+            b.start_at
+          )
+      )
 
-const availableStartTimes=startTimes.filter(t=>{
+  const startTimes=
+    times.filter(
+      (_,i)=>i<times.length-1
+    )
 
-const m=M(t)
+  const availableStartTimes=
+    startTimes.filter(t=>{
 
-return !roomReservations.some(r=>{
+      const m=M(t)
 
-const s=M(fmt(r.start_at))
-const e=M(fmt(r.end_at))
+      return !roomReservations.some(r=>{
 
-return m>=s&&m<e
+        const s=M(fmt(r.start_at))
+        const e=M(fmt(r.end_at))
 
-})
+        return m>=s&&m<e
 
-})
+      })
 
-const nextBusy=
-roomReservations
-.map(r=>M(fmt(r.start_at)))
-.find(m=>m>M(start))
+    })
 
-const availableEndTimes=
-times.filter(t=>{
+  const nextBusy=
+    roomReservations
+      .map(
+        r=>M(fmt(r.start_at))
+      )
+      .find(
+        m=>m>M(start)
+      )
 
-const s=M(start)
-const e=M(t)
+  const availableEndTimes=
+    times.filter(t=>{
 
-return(
-e>s&&
-e<=s+240&&
-(nextBusy===undefined||e<=nextBusy)
-)
+      const s=M(start)
+      const e=M(t)
 
-})
+      return(
+        e>s&&
+        e<=s+240&&
+        (
+          nextBusy===undefined||
+          e<=nextBusy
+        )
+      )
 
-return(
-<div className="modal">
-<div className="modal-content">
+    })
 
-<h2>
-{editing?"Edit Reservation":"Reserve Meeting Room"}
-</h2>
+  return(
+    <div className="modal">
+      <div className="modal-content">
 
-<div className="small">
-{selectedDate}
-</div>
+        <h2>
+          {
+            editing
+              ?"Edit Reservation"
+              :"Reserve Meeting Room"
+          }
+        </h2>
 
-<div className="small" style={{marginBottom:"10px"}}>
-Working in {timeMode==="kyiv"?"Kyiv time":"your local time"}
-</div>
+        <div className="small">
+          {selectedDate}
+        </div>
 
-<label>
-Meeting title
-</label>
+        <div
+          className="small"
+          style={{
+            marginBottom:"10px"
+          }}
+        >
+          Working in {
+            timeMode==="kyiv"
+              ?"Kyiv time"
+              :"your local time"
+          }
+        </div>
 
-<input
-placeholder="Enter meeting title..."
-value={title}
-maxLength={100}
-onChange={e=>setTitle(e.target.value)}
-/>
+        <label>
+          Meeting title
+        </label>
 
-{error&&
-<div className="error">
-{error}
-</div>
-}
+        <input
+          placeholder="Enter meeting title..."
+          value={title}
+          maxLength={100}
+          onChange={
+            e=>setTitle(
+              e.target.value
+            )
+          }
+        />
 
-<label>
-Room
-</label>
+        {error&&
+          <div className="error">
+            {error}
+          </div>
+        }
 
-<select
-value={roomId}
-onChange={e=>setRoomId(e.target.value)}
->
-<option value="">
-Select room
-</option>
+        <label>
+          Room
+        </label>
 
-{rooms.map(r=>
-<option
-key={r.id}
-value={r.id}
->
-{r.name}
-</option>
-)}
-</select>
+        <select
+          value={roomId}
+          onChange={
+            e=>setRoomId(
+              e.target.value
+            )
+          }
+        >
+          <option value="">
+            Select room
+          </option>
 
-<label>
-Start time
-</label>
+          {rooms.map(r=>
+            <option
+              key={r.id}
+              value={r.id}
+            >
+              {`${r.name} · ${floorText(r.floor)} · Capacity ${r.capacity}`}
+            </option>
+          )}
+        </select>
 
-<select
-value={start}
-onChange={e=>setStart(e.target.value)}
->
-{availableStartTimes.map(t=>
-<option
-key={t}
-value={t}
->
-{t}
-</option>
-)}
-</select>
+        <label>
+          Start time
+        </label>
 
-<label>
-End time
-</label>
+        <select
+          value={start}
+          onChange={
+            e=>setStart(
+              e.target.value
+            )
+          }
+        >
+          {availableStartTimes.map(t=>
+            <option
+              key={t}
+              value={t}
+            >
+              {t}
+            </option>
+          )}
+        </select>
 
-<select
-value={end}
-onChange={e=>setEnd(e.target.value)}
->
-{availableEndTimes.map(t=>
-<option
-key={t}
-value={t}
->
-{t}
-</option>
-)}
-</select>
+        <label>
+          End time
+        </label>
 
-<div className="modal-buttons">
+        <select
+          value={end}
+          onChange={
+            e=>setEnd(
+              e.target.value
+            )
+          }
+        >
+          {availableEndTimes.map(t=>
+            <option
+              key={t}
+              value={t}
+            >
+              {t}
+            </option>
+          )}
+        </select>
 
-<button
-className="primary"
-disabled={
-loading||
-!title.trim()||
-!roomId||
-!availableEndTimes.length
-}
-onClick={onReserve}
->
-{loading
-?"Reserving..."
-:editing
-?"Save Changes"
-:"Reserve"}
-</button>
+        <div className="modal-buttons">
 
-<button
-className="secondary"
-disabled={loading}
-onClick={onClose}
->
-Close
-</button>
+          <button
+            className="primary"
+            disabled={
+              loading||
+              !title.trim()||
+              !roomId||
+              !availableEndTimes.length
+            }
+            onClick={onReserve}
+          >
+            {
+              loading
+                ?"Reserving..."
+                :editing
+                ?"Save Changes"
+                :"Reserve"
+            }
+          </button>
 
-</div>
+          <button
+            className="secondary"
+            disabled={loading}
+            onClick={onClose}
+          >
+            Close
+          </button>
 
-</div>
-</div>
-)
+        </div>
+
+      </div>
+    </div>
+  )
 
 }
