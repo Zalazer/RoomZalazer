@@ -1,16 +1,4 @@
-type Room={
-  id:number
-  name:string
-  capacity:number
-  floor:number
-}
-
-type Reservation={
-  id:number
-  room_id:number
-  start_at:string
-  end_at:string
-}
+import type { Room, Reservation } from "../hooks/useAppData"
 
 type Props={
   show:boolean
@@ -92,6 +80,7 @@ export default function ReservationModal({
       .filter(
         r=>
           r.room_id===Number(roomId)&&
+          r.status!=="cancelled"&&
           new Intl.DateTimeFormat(
             "en-CA",
             {
@@ -104,15 +93,11 @@ export default function ReservationModal({
       )
       .sort(
         (a,b)=>
-          a.start_at.localeCompare(
-            b.start_at
-          )
+          a.start_at.localeCompare(b.start_at)
       )
 
   const startTimes=
-    times.filter(
-      (_,i)=>i<times.length-1
-    )
+    times.filter((_,i)=>i<times.length-1)
 
   const availableStartTimes=
     startTimes.filter(t=>{
@@ -132,12 +117,8 @@ export default function ReservationModal({
 
   const nextBusy=
     roomReservations
-      .map(
-        r=>M(fmt(r.start_at))
-      )
-      .find(
-        m=>m>M(start)
-      )
+      .map(r=>M(fmt(r.start_at)))
+      .find(m=>m>M(start))
 
   const availableEndTimes=
     times.filter(t=>{
@@ -156,16 +137,17 @@ export default function ReservationModal({
 
     })
 
+  const selectedRoom=
+    rooms.find(r=>String(r.id)===roomId)
+
   return(
     <div className="modal">
       <div className="modal-content">
 
         <h2>
-          {
-            editing
-              ?"Edit Reservation"
-              :"Reserve Meeting Room"
-          }
+          {editing
+            ?"Edit Reservation"
+            :"Reserve Meeting Room"}
         </h2>
 
         <div className="small">
@@ -174,9 +156,7 @@ export default function ReservationModal({
 
         <div
           className="small"
-          style={{
-            marginBottom:"10px"
-          }}
+          style={{marginBottom:"10px"}}
         >
           Working in {
             timeMode==="kyiv"
@@ -185,19 +165,13 @@ export default function ReservationModal({
           }
         </div>
 
-        <label>
-          Meeting title
-        </label>
+        <label>Meeting title</label>
 
         <input
           placeholder="Enter meeting title..."
           value={title}
           maxLength={100}
-          onChange={
-            e=>setTitle(
-              e.target.value
-            )
-          }
+          onChange={e=>setTitle(e.target.value)}
         />
 
         {error&&
@@ -206,17 +180,11 @@ export default function ReservationModal({
           </div>
         }
 
-        <label>
-          Room
-        </label>
+        <label>Room</label>
 
         <select
           value={roomId}
-          onChange={
-            e=>setRoomId(
-              e.target.value
-            )
-          }
+          onChange={e=>setRoomId(e.target.value)}
         >
           <option value="">
             Select room
@@ -232,17 +200,25 @@ export default function ReservationModal({
           )}
         </select>
 
-        <label>
-          Start time
-        </label>
+        {selectedRoom&&(
+          <div
+            className="small"
+            style={{marginBottom:"12px"}}
+          >
+            {selectedRoom.area!=null&&<>Area: {selectedRoom.area} m²<br/></>}
+            {selectedRoom.windows&&<>Windows: {selectedRoom.windows}<br/></>}
+            {selectedRoom.equipment&&<>Equipment: {selectedRoom.equipment}<br/></>}
+            {!!selectedRoom.features?.length&&(
+              <>Features: {selectedRoom.features.join(", ")}</>
+            )}
+          </div>
+        )}
+
+        <label>Start time</label>
 
         <select
           value={start}
-          onChange={
-            e=>setStart(
-              e.target.value
-            )
-          }
+          onChange={e=>setStart(e.target.value)}
         >
           {availableStartTimes.map(t=>
             <option
@@ -254,17 +230,11 @@ export default function ReservationModal({
           )}
         </select>
 
-        <label>
-          End time
-        </label>
+        <label>End time</label>
 
         <select
           value={end}
-          onChange={
-            e=>setEnd(
-              e.target.value
-            )
-          }
+          onChange={e=>setEnd(e.target.value)}
         >
           {availableEndTimes.map(t=>
             <option
@@ -288,13 +258,11 @@ export default function ReservationModal({
             }
             onClick={onReserve}
           >
-            {
-              loading
-                ?"Reserving..."
-                :editing
+            {loading
+              ?"Reserving..."
+              :editing
                 ?"Save Changes"
-                :"Reserve"
-            }
+                :"Reserve"}
           </button>
 
           <button

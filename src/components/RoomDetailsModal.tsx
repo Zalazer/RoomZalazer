@@ -1,19 +1,4 @@
-type Room={
-  id:number
-  name:string
-  capacity:number
-  description:string
-  floor:number
-}
-
-type Reservation={
-  id:number
-  room_id:number
-  title:string
-  user_name?:string
-  start_at:string
-  end_at:string
-}
+import type { Room, Reservation } from "../hooks/useAppData"
 
 type Props={
   room:Room
@@ -38,7 +23,8 @@ export default function RoomDetailsModal({
   const list=reservations.filter(
     r=>
       r.room_id===room.id&&
-      r.start_at.slice(0,10)===selectedDate
+      r.start_at.slice(0,10)===selectedDate&&
+      r.status!=="cancelled"
   )
 
   const fmt=(v:string)=>
@@ -75,7 +61,26 @@ export default function RoomDetailsModal({
           {floorSuffix}
           {" floor · Capacity "}
           {room.capacity}
+          {room.area!=null&&` · ${room.area} m²`}
         </h2>
+
+        {!!room.features?.length&&(
+          <div
+            className="small"
+            style={{marginBottom:"6px"}}
+          >
+            {room.features.join(" • ")}
+          </div>
+        )}
+
+        {room.equipment&&(
+          <div
+            className="small"
+            style={{marginBottom:"6px"}}
+          >
+            Equipment: {room.equipment}
+          </div>
+        )}
 
         <div
           className="small"
@@ -104,10 +109,9 @@ export default function RoomDetailsModal({
               key={time}
               className="info room-slot"
               style={{
-                color:
-                  item
-                    ?"#ffc0c0"
-                    :"#97ffbd"
+                color:item
+                  ?"#ffc0c0"
+                  :"#97ffbd"
               }}
             >
 
@@ -116,11 +120,9 @@ export default function RoomDetailsModal({
               </span>
 
               <span>
-                {
-                  item
-                    ?`${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name??"Reserved"}`
-                    :"FREE"
-                }
+                {item
+                  ?`${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name??"Reserved"}`
+                  :"FREE"}
               </span>
 
             </div>

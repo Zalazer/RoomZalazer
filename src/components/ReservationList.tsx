@@ -1,14 +1,4 @@
-type Reservation={
-  id:number
-  room_id:number
-  room_name?:string
-  room_capacity?:number
-  room_floor?:number
-  title:string
-  start_at:string
-  end_at:string
-  status?:string
-}
+import type { Reservation } from "../hooks/useAppData"
 
 type Props={
   title:string
@@ -52,13 +42,11 @@ export default function ReservationList({
     formatDateTime(v).split(", ").pop()||""
 
   const floorSuffix=(floor?:number)=>{
-    if(!floor)return "th"
-
-    if(floor===1)return "st"
-    if(floor===2)return "nd"
-    if(floor===3)return "rd"
-
-    return "th"
+    if(!floor)return"th"
+    if(floor===1)return"st"
+    if(floor===2)return"nd"
+    if(floor===3)return"rd"
+    return"th"
   }
 
   return(
@@ -66,11 +54,11 @@ export default function ReservationList({
 
       <h2>
         {title}
-        {title.toLowerCase().includes("past")&&
+        {title.toLowerCase().includes("past")&&(
           <span className="small">
             &nbsp;(Tap to view)
           </span>
-        }
+        )}
       </h2>
 
       <div
@@ -84,14 +72,11 @@ export default function ReservationList({
         }
       </div>
 
-      {!list.length?
-
+      {!list.length?(
         <div className="small">
           No reservations.
         </div>
-
-        :
-
+      ):(
         list.map(r=>{
 
           const finished=
@@ -110,7 +95,6 @@ export default function ReservationList({
             displayStatus==="cancelled"
 
           return(
-
             <div
               key={r.id}
               className="reservation"
@@ -121,10 +105,7 @@ export default function ReservationList({
                     :displayStatus==="cancelled"
                       ?"rgba(255,80,80,.06)"
                       :undefined,
-                cursor:
-                  clickable
-                    ?"pointer"
-                    :"default",
+                cursor:clickable?"pointer":"default",
                 marginBottom:"6px"
               }}
               onClick={()=>{
@@ -148,18 +129,17 @@ export default function ReservationList({
               </div>
 
               <div className="small">
-                {r.room_name??`Room #${r.room_id}`}
+                {r.room.name}
                 {" · "}
-                {r.room_floor??"?"}
-                {floorSuffix(r.room_floor)}
-                {" floor"}
-                {" · Capacity "}
-                {r.room_capacity??"?"}
-                {"   Status: "}
+                {r.room.floor}
+                {floorSuffix(r.room.floor)}
+                {" floor · Capacity "}
+                {r.room.capacity}
+                {" · Status: "}
                 {displayStatus}
               </div>
 
-              {displayStatus==="reserved"&&
+              {displayStatus==="reserved"&&(
                 <div className="actions">
 
                   <button
@@ -183,15 +163,13 @@ export default function ReservationList({
                   </button>
 
                 </div>
-              }
+              )}
 
             </div>
-
           )
 
         })
-
-      }
+      )}
 
     </div>
   )

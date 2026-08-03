@@ -102,14 +102,30 @@ mode==="kyiv"
 
 
 
-export type User={id:string,name:string,email:string}
+export type User={
+id:string
+name:string
+email:string
+email_verified:boolean
+role:string
+active:boolean
+}
 
 export type Room={
 id:number
 name:string
-capacity:number
 description:string
+capacity:number
 floor:number
+area?:number
+windows?:string
+equipment?:string
+photo_url?:string
+features?:string[]
+photos?:{
+photo_url:string
+sort_order:number
+}[]
 }
 
 export type Reservation={
@@ -118,12 +134,27 @@ room_id:number
 title:string
 start_at:string
 end_at:string
-user_name?:string
-room_name?:string
-room_capacity?:number
-room_floor?:number
 status?:string
+user_name?:string
+
+room:{
+id:number
+name:string
+description:string
+capacity:number
+floor:number
+area?:number|null
+windows?:string|null
+equipment?:string|null
+photo_url?:string|null
+features:string[]
+photos:{
+photo_url:string
+sort_order:number
+}[]
 }
+}
+
 
 const mins=(v:string)=>Number(v.slice(0,2))*60+Number(v.slice(3,5))
 
