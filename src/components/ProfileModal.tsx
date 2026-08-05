@@ -1,15 +1,15 @@
-type Props={
-  show:boolean
-  name:string
-  email:string
-  password:string
-  setName:(v:string)=>void
-  setEmail:(v:string)=>void
-  setPassword:(v:string)=>void
-  error:string
-  success:string
-  onSave:()=>void
-  onClose:()=>void
+type Props = {
+  show: boolean
+  name: string
+  email: string
+  password: string
+  setName: (v: string) => void
+  setEmail: (v: string) => void
+  setPassword: (v: string) => void
+  error: string
+  success: string
+  onSave: () => void
+  onClose: () => void
 }
 
 export default function ProfileModal({
@@ -23,55 +23,44 @@ export default function ProfileModal({
   error,
   success,
   onSave,
-  onClose
-}:Props){
+  onClose,
+}: Props) {
+  if (!show) return null
 
-  if(!show)return null
-
-  return(
+  return (
     <div className="profile-modal">
-
       <div className="profile-modal-content">
-
         <h2>Edit Profile</h2>
 
         <input
           placeholder="Name"
           value={name}
-          maxLength={100}
-          onChange={e=>setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
         />
 
         <input
           type="email"
           placeholder="Email"
           value={email}
-          maxLength={255}
-          onChange={e=>setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
         />
 
         <input
           type="password"
-          placeholder="New Password (optional)"
+          placeholder="New Password (leave blank to keep current)"
           value={password}
-          minLength={8}
-          maxLength={72}
-          onChange={e=>setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
         />
 
-        {error&&(
-          <div className="error">
-            {error}
-          </div>
-        )}
+        {!!error && <div className="error">{error}</div>}
 
-        {success&&(
+        {!!success && (
           <div
+            className="small"
             style={{
-              color:"#37d76d",
-              fontSize:"14px",
-              marginTop:"8px",
-              marginBottom:"8px"
+              color: "#37d76d",
+              marginTop: "8px",
+              marginBottom: "8px",
             }}
           >
             {success}
@@ -79,7 +68,6 @@ export default function ProfileModal({
         )}
 
         <div className="modal-buttons">
-
           <button
             className="primary"
             onClick={onSave}
@@ -93,12 +81,8 @@ export default function ProfileModal({
           >
             Close
           </button>
-
         </div>
-
       </div>
-
     </div>
   )
-
 }
