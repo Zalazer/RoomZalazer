@@ -255,9 +255,6 @@ function getDisplayYmd(value: string, mode: "kyiv" | "local") {
   return mode === "kyiv" ? kyivYmd(d) : localYmd(d)
 }
 
-function getDisplayHm(value: string, mode: "kyiv" | "local") {
-  return fromUTC(value, mode)
-}
 
 function getOfficeDateForSelectedDate(
   selectedDate: string,
@@ -624,9 +621,9 @@ export function useAppData() {
   }, [serverNow, serverReceivedAt])
 
   useEffect(() => {
-    if (!serverNow) return
-    setSelectedDate(getTodayYmd(timeMode, serverNow, serverReceivedAt))
-  }, [timeMode, serverNow, serverReceivedAt])
+  if (!serverNow || selectedDate) return
+  setSelectedDate(getTodayYmd(timeMode, serverNow, serverReceivedAt))
+}, [timeMode, serverNow, serverReceivedAt, selectedDate])
 
   useEffect(() => {
     void initApp()
