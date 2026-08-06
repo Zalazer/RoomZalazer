@@ -27,6 +27,46 @@ const toYmd = (date: Date, zone: string) => {
 
 const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
 
+const toUtcFromZone = (date: string, time: string, zone: string) => {
+  const [y, m, d] = date.split("-").map(Number)
+  const [h, min] = time.split(":").map(Number)
+
+  const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(probeUtc)
+
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || "0")
+
+  const seenY = get("year")
+  const seenM = get("month")
+  const seenD = get("day")
+  const seenH = get("hour")
+  const seenMin = get("minute")
+
+  const desired = Date.UTC(y, m - 1, d, h, min)
+  const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+  const diff = desired - seen
+
+  return new Date(probeUtc.getTime() + diff)
+}
+
+const getOfficeDateForSelectedDate = (selectedDate: string, timeMode: "kyiv" | "local") => {
+  if (timeMode === "kyiv") return selectedDate
+
+  const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const localMiddayUtc = toUtcFromZone(selectedDate, "12:00", localZone)
+
+  return toYmd(localMiddayUtc, "Europe/Kyiv")
+}
+
 export default function RoomCard({
   room,
   reservations,
@@ -37,10 +77,8 @@ export default function RoomCard({
   nowUtcMs,
   onClick,
 }: Props) {
-  const zone =
-    timeMode === "kyiv"
-      ? "Europe/Kyiv"
-      : Intl.DateTimeFormat().resolvedOptions().timeZone
+  const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
 
   const floorLabel = (n: number) => {
     if (n === 1) return "1st floor"
@@ -49,30 +87,40 @@ export default function RoomCard({
     return `${n}th floor`
   }
 
-  const dateOf = (v: string) => toYmd(parseUtc(v), zone)
+  const dateOf = (v: string, targetZone: string) => toYmd(parseUtc(v), targetZone)
 
-  const fmt = (v: string) =>
+  const fmtDateInZone = (date: Date, targetZone: string) =>
     new Intl.DateTimeFormat("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-      timeZone: zone,
-    }).format(parseUtc(v))
-
-  const fmtDate = (date: Date) =>
-    new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: zone,
+      timeZone: targetZone,
     }).format(date)
+
+  const formatStatusTime = (utcValue: string | Date) => {
+    const date = utcValue instanceof Date ? utcValue : parseUtc(utcValue)
+
+    const localText = fmtDateInZone(date, localZone)
+    const kyivText = fmtDateInZone(date, "Europe/Kyiv")
+
+    if (timeMode === "kyiv") return kyivText
+    return `${localText} (${kyivText} Kyiv)`
+  }
+
+  const formatOfficeEnd = (officeDay: string, officeEndHm: string) => {
+    const endUtc = toUtcFromZone(officeDay, officeEndHm, "Europe/Kyiv")
+    const localText = fmtDateInZone(endUtc, localZone)
+
+    if (timeMode === "kyiv") return officeEndHm
+    return `${localText} (${officeEndHm} Kyiv)`
+  }
 
   const roomReservations = reservations
     .filter(
       (r) =>
         r.room_id === room.id &&
         r.status !== "cancelled" &&
-        dateOf(r.start_at) === selectedDate
+        dateOf(r.start_at, "Europe/Kyiv") === officeDate
     )
     .sort(
       (a, b) =>
@@ -110,11 +158,11 @@ export default function RoomCard({
   )
 
   const statusText = active
-    ? `Busy till ${fmtDate(new Date(busyUntilMs!))}`
+    ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
     : nextUpcoming
-    ? `Free till ${fmt(nextUpcoming.start_at)}`
+    ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
     : officeEnd
-    ? `Free till ${officeEnd}`
+    ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
     : "Available"
 
   return (
@@ -160,7 +208,6 @@ export default function RoomCard({
         }}
       >
         {statusText}
-        {!active && timeMode === "kyiv" && officeEnd ? " · Kyiv time" : ""}
       </div>
     </div>
   )
