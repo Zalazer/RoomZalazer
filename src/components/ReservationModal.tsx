@@ -27,6 +27,8 @@ const M = (v: string) =>
 
 const isHm = (v: string) => /^\d{2}:\d{2}$/.test(v)
 
+const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+
 export default function ReservationModal({
   show,
   rooms,
@@ -64,7 +66,7 @@ export default function ReservationModal({
       minute: "2-digit",
       hour12: false,
       timeZone: zone,
-    }).format(new Date(`${v}Z`))
+    }).format(parseUtc(v))
 
   const dateOf = (v: string) =>
     new Intl.DateTimeFormat("en-US", {
@@ -73,7 +75,7 @@ export default function ReservationModal({
       month: "2-digit",
       day: "2-digit",
     })
-      .formatToParts(new Date(`${v}Z`))
+      .formatToParts(parseUtc(v))
       .reduce((acc, part) => {
         if (part.type !== "literal") acc[part.type] = part.value
         return acc
@@ -92,8 +94,8 @@ export default function ReservationModal({
     })
     .sort(
       (a, b) =>
-        new Date(`${a.start_at}Z`).getTime() -
-        new Date(`${b.start_at}Z`).getTime()
+        parseUtc(a.start_at).getTime() -
+        parseUtc(b.start_at).getTime()
     )
 
   const selectedRoom = rooms.find((r) => String(r.id) === roomId)
@@ -191,8 +193,8 @@ export default function ReservationModal({
               })
               .sort(
                 (a, b) =>
-                  new Date(`${a.start_at}Z`).getTime() -
-                  new Date(`${b.start_at}Z`).getTime()
+                  parseUtc(a.start_at).getTime() -
+                  parseUtc(b.start_at).getTime()
               )
 
             const nextAvailableStarts = (times.length > 1 ? times.slice(0, -1) : times).filter(

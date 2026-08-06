@@ -9,6 +9,20 @@ import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
 import { useAppData } from "./hooks/useAppData"
 
+const parseReservationDate = (value: string, mode: "kyiv" | "local") => {
+  const utc = new Date(`${String(value).replace(" ", "T")}Z`)
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone:
+      mode === "kyiv"
+        ? "Europe/Kyiv"
+        : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(utc)
+}
+
 export default function App() {
   const a = useAppData()
 
@@ -135,47 +149,27 @@ export default function App() {
           }}
         />
 
+
         {a.showCurrent && (
           <ReservationList
             title="Current Reservations"
             reservations={a.currentReservations}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
+            nowUtcMs={a.nowUtcMs}
             onDelete={a.deleteReservation}
             onEdit={a.editReservation}
             onOpenPast={(r) => {
-              const date =
-                a.timeMode === "kyiv"
-                  ? new Intl.DateTimeFormat("en-US", {
-                      timeZone: "Europe/Kyiv",
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    })
-                      .formatToParts(new Date(`${r.start_at}Z`))
-                      .reduce((acc, part) => {
-                        if (part.type !== "literal") acc[part.type] = part.value
-                        return acc
-                      }, {} as Record<string, string>)
-                  : null
-
-              const nextDate =
-                a.timeMode === "kyiv" && date
-                  ? `${date.year}-${date.month}-${date.day}`
-                  : (() => {
-                      const d = new Date(`${r.start_at}Z`)
-                      const y = d.getFullYear()
-                      const m = String(d.getMonth() + 1).padStart(2, "0")
-                      const day = String(d.getDate()).padStart(2, "0")
-                      return `${y}-${m}-${day}`
-                    })()
+              const nextDate = parseReservationDate(r.start_at, a.timeMode)
 
               a.setSelectedDate(nextDate)
+
               const room = a.rooms.find((v) => v.id === r.room_id)
               if (room) a.setSelectedRoom(room)
             }}
           />
         )}
+
 
         {a.showPast && (
           <ReservationList
@@ -183,36 +177,14 @@ export default function App() {
             reservations={a.pastReservations}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
+            nowUtcMs={a.nowUtcMs}
             onDelete={a.deleteReservation}
             onEdit={a.editReservation}
             onOpenPast={(r) => {
-              const date =
-                a.timeMode === "kyiv"
-                  ? new Intl.DateTimeFormat("en-US", {
-                      timeZone: "Europe/Kyiv",
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    })
-                      .formatToParts(new Date(`${r.start_at}Z`))
-                      .reduce((acc, part) => {
-                        if (part.type !== "literal") acc[part.type] = part.value
-                        return acc
-                      }, {} as Record<string, string>)
-                  : null
-
-              const nextDate =
-                a.timeMode === "kyiv" && date
-                  ? `${date.year}-${date.month}-${date.day}`
-                  : (() => {
-                      const d = new Date(`${r.start_at}Z`)
-                      const y = d.getFullYear()
-                      const m = String(d.getMonth() + 1).padStart(2, "0")
-                      const day = String(d.getDate()).padStart(2, "0")
-                      return `${y}-${m}-${day}`
-                    })()
+              const nextDate = parseReservationDate(r.start_at, a.timeMode)
 
               a.setSelectedDate(nextDate)
+
               const room = a.rooms.find((v) => v.id === r.room_id)
               if (room) a.setSelectedRoom(room)
             }}
@@ -228,7 +200,11 @@ export default function App() {
           selectedDate={a.selectedDate}
           setSelectedDate={a.setSelectedDate}
           formatDate={a.formatDate}
+          todayDate={a.todayDate}
+          formatWeekdayShort={a.formatWeekdayShort}
+          formatDayNumber={a.formatDayNumber}
         />
+
 
         {a.rooms.map((room) => (
           <RoomCard
@@ -239,6 +215,7 @@ export default function App() {
             timeMode={a.timeMode}
             times={a.TIMES}
             officeSettings={a.officeSettings}
+            nowUtcMs={a.nowUtcMs}
             onClick={() => a.setSelectedRoom(room)}
           />
         ))}

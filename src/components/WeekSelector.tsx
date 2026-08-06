@@ -2,9 +2,14 @@ type Props = {
   selectedDate: string
   setSelectedDate: (v: string) => void
   formatDate: (v: string) => string
+  todayDate: string
+  formatWeekdayShort: (v: string) => string
+  formatDayNumber: (v: string) => string
 }
 
 const pad = (n: number) => String(n).padStart(2, "0")
+
+const isYmd = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 
 const fromYmd = (value: string) => {
   const [y, m, d] = value.split("-").map(Number)
@@ -17,11 +22,16 @@ const toYmd = (d: Date) =>
 export default function WeekSelector({
   selectedDate,
   setSelectedDate,
+  todayDate,
+  formatWeekdayShort,
+  formatDayNumber,
 }: Props) {
+  const safeToday = isYmd(todayDate) ? todayDate : toYmd(new Date())
+
   const current =
-  /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)
+    isYmd(selectedDate)
       ? fromYmd(selectedDate)
-      : new Date()
+      : fromYmd(safeToday)
 
   function addWeek(days: number) {
     const d = new Date(current)
@@ -41,8 +51,6 @@ export default function WeekSelector({
 
     setSelectedDate(toYmd(d))
   }
-
-  const today = toYmd(new Date())
 
   const weekStart = new Date(current)
   weekStart.setDate(current.getDate() - ((current.getDay() + 6) % 7))
@@ -86,7 +94,7 @@ export default function WeekSelector({
             padding: "8px 10px",
             fontSize: "14px",
           }}
-          onClick={() => setSelectedDate(today)}
+          onClick={() => setSelectedDate(safeToday)}
         >
           Today
         </button>
@@ -151,17 +159,8 @@ export default function WeekSelector({
               }}
               onClick={() => setSelectedDate(value)}
             >
-              <span>
-                {d.toLocaleDateString("en-GB", {
-                  weekday: "short",
-                })}
-              </span>
-
-              <span>
-                {d.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                })}
-              </span>
+              <span>{formatWeekdayShort(value)}</span>
+              <span>{formatDayNumber(value)}</span>
             </button>
           )
         })}

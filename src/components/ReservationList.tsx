@@ -5,39 +5,59 @@ type Props = {
   reservations: Reservation[]
   timeMode: "kyiv" | "local"
   formatDateTime: (v: string) => string
+  nowUtcMs: number
   onDelete: (id: number) => void
   onEdit: (id: number) => void
   onOpenPast?: (r: Reservation) => void
 }
 
-const utc = (v: string) => new Date(`${v}Z`)
+const safeUtc = (v?: string | null) => {
+  if (!v) return null
+  const d = new Date(`${String(v).replace(" ", "T")}Z`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
 
 export default function ReservationList({
   title,
   reservations,
   timeMode,
   formatDateTime,
+  nowUtcMs,
   onDelete,
   onEdit,
   onOpenPast,
 }: Props) {
-  const now = Date.now()
-
   const floorText = (n?: number) => {
-    if (!n) return ""
+    if (n == null) return ""
     if (n === 1) return "1st"
     if (n === 2) return "2nd"
     if (n === 3) return "3rd"
     return `${n}th`
   }
 
-  const endTime = (v: string) => {
-    const full = formatDateTime(v)
+  const safeFormatDateTime = (v?: string | null) => {
+    if (!v) return "Unknown time"
+    try {
+      return formatDateTime(v)
+    } catch {
+      return "Unknown time"
+    }
+  }
+
+  const endTime = (v?: string | null) => {
+    const full = safeFormatDateTime(v)
     return full.split(", ").pop() || full
   }
 
-  const duration = (a: string, b: string) =>
-    Math.round((utc(b).getTime() - utc(a).getTime()) / 60000)
+  const duration = (a?: string | null, b?: string | null) => {
+    const start = safeUtc(a)
+    const end = safeUtc(b)
+
+    if (!start || !end) return null
+
+    const minutes = Math.round((end.getTime() - start.getTime()) / 60000)
+    return Number.isFinite(minutes) && minutes >= 0 ? minutes : null
+  }
 
   const list = [...reservations].sort((a, b) => {
     const ac = a.status === "cancelled"
@@ -45,7 +65,10 @@ export default function ReservationList({
 
     if (ac !== bc) return ac ? 1 : -1
 
-    return utc(a.start_at).getTime() - utc(b.start_at).getTime()
+    const at = safeUtc(a.start_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    const bt = safeUtc(b.start_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
+
+    return at - bt
   })
 
   return (
@@ -70,8 +93,9 @@ export default function ReservationList({
         <div className="small">No reservations.</div>
       ) : (
         list.map((r) => {
+          const endDate = safeUtc(r.end_at)
           const isCancelled = r.status === "cancelled"
-          const isFinished = !isCancelled && utc(r.end_at).getTime() < now
+          const isFinished = !isCancelled && !!endDate && endDate.getTime() < nowUtcMs
 
           const status = isCancelled
             ? "cancelled"
@@ -80,6 +104,7 @@ export default function ReservationList({
             : "reserved"
 
           const clickable = status !== "reserved"
+          const mins = duration(r.start_at, r.end_at)
 
           return (
             <div
@@ -100,25 +125,33 @@ export default function ReservationList({
               }}
             >
               <div className="title">
-                {formatDateTime(r.start_at)}
+                {safeFormatDateTime(r.start_at)}
                 {" - "}
                 {endTime(r.end_at)}
-                {" · "}
-                {duration(r.start_at, r.end_at)}
-                {" min"}
+                {mins !== null && (
+                  <>
+                    {" · "}
+                    {mins}
+                    {" min"}
+                  </>
+                )}
               </div>
 
-              <div>{r.title}</div>
+              <div>{r.title || "Untitled reservation"}</div>
 
               <div className="small">
-                {r.room.name}
-                {" · "}
-                {floorText(r.room.floor)}
-                {" floor"}
+                {r.room?.name || "Unknown room"}
+                {r.room?.floor != null && (
+                  <>
+                    {" · "}
+                    {floorText(r.room.floor)}
+                    {" floor"}
+                  </>
+                )}
                 {" · Capacity "}
-                {r.room.capacity}
-                {r.room.area != null && ` · ${r.room.area} m²`}
-                {r.room.windows && ` · ${r.room.windows}`}
+                {r.room?.capacity ?? "-"}
+                {r.room?.area != null && ` · ${r.room.area} m²`}
+                {r.room?.windows && ` · ${r.room.windows}`}
                 {" · "}
                 {status}
               </div>

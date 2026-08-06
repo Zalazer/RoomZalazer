@@ -24,6 +24,8 @@ function toYmd(date: Date, zone: string) {
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
+const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+
 export default function Timeline({
   roomId,
   reservations,
@@ -42,9 +44,9 @@ export default function Timeline({
       minute: "2-digit",
       hour12: false,
       timeZone: zone,
-    }).format(new Date(`${v}Z`))
+    }).format(parseUtc(v))
 
-  const dateOf = (v: string) => toYmd(new Date(`${v}Z`), zone)
+  const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const roomReservations = reservations.filter(
     (r) =>

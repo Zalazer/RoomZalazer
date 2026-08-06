@@ -8,6 +8,7 @@ type Props = {
   timeMode: "kyiv" | "local"
   times: string[]
   officeSettings: any
+  nowUtcMs: number
   onClick: () => void
 }
 
@@ -24,6 +25,8 @@ const toYmd = (date: Date, zone: string) => {
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
+const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+
 export default function RoomCard({
   room,
   reservations,
@@ -31,6 +34,7 @@ export default function RoomCard({
   timeMode,
   times,
   officeSettings,
+  nowUtcMs,
   onClick,
 }: Props) {
   const zone =
@@ -45,7 +49,7 @@ export default function RoomCard({
     return `${n}th floor`
   }
 
-  const dateOf = (v: string) => toYmd(new Date(`${v}Z`), zone)
+  const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const fmt = (v: string) =>
     new Intl.DateTimeFormat("en-GB", {
@@ -53,7 +57,7 @@ export default function RoomCard({
       minute: "2-digit",
       hour12: false,
       timeZone: zone,
-    }).format(new Date(`${v}Z`))
+    }).format(parseUtc(v))
 
   const roomReservations = reservations.filter(
     (r) =>
@@ -62,21 +66,19 @@ export default function RoomCard({
       dateOf(r.start_at) === selectedDate
   )
 
-  const now = new Date()
-
   const active = roomReservations.find((r) => {
-    const s = new Date(`${r.start_at}Z`)
-    const e = new Date(`${r.end_at}Z`)
-    return now >= s && now < e
+    const s = parseUtc(r.start_at).getTime()
+    const e = parseUtc(r.end_at).getTime()
+    return nowUtcMs >= s && nowUtcMs < e
   })
 
   const officeEnd = officeSettings?.working_day_end ?? ""
 
   const nextUpcoming = roomReservations
-    .filter((r) => new Date(`${r.start_at}Z`).getTime() > now.getTime())
+    .filter((r) => parseUtc(r.start_at).getTime() > nowUtcMs)
     .sort(
       (a, b) =>
-        new Date(`${a.start_at}Z`).getTime() - new Date(`${b.start_at}Z`).getTime()
+        parseUtc(a.start_at).getTime() - parseUtc(b.start_at).getTime()
     )[0]
 
   const statusText = active

@@ -23,6 +23,8 @@ function toYmd(date: Date, zone: string) {
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
+const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+
 export default function RoomDetailsModal({
   room,
   reservations,
@@ -44,8 +46,8 @@ export default function RoomDetailsModal({
     timeZone: zone,
   })
 
-  const fmt = (v: string) => timeFormatter.format(new Date(`${v}Z`))
-  const dateOf = (v: string) => toYmd(new Date(`${v}Z`), zone)
+  const fmt = (v: string) => timeFormatter.format(parseUtc(v))
+  const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const list = reservations
     .filter(
@@ -56,7 +58,7 @@ export default function RoomDetailsModal({
     )
     .sort(
       (a, b) =>
-        new Date(`${a.start_at}Z`).getTime() - new Date(`${b.start_at}Z`).getTime()
+        parseUtc(a.start_at).getTime() - parseUtc(b.start_at).getTime()
     )
 
   const floorSuffix =

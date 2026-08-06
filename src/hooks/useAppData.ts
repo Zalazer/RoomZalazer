@@ -131,9 +131,9 @@ function localYmd(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-function localDateFromYmd(ymd: string) {
+function utcDateFromYmd(ymd: string) {
   const [y, m, d] = ymd.split("-").map(Number)
-  return new Date(y, m - 1, d)
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
 }
 
 function kyivYmd(date: Date) {
@@ -142,6 +142,21 @@ function kyivYmd(date: Date) {
 
 function kyivHm(date: Date) {
   return hmFromDate(date, "Europe/Kyiv")
+}
+
+function getCurrentUtc(serverNow: string, serverReceivedAt: number) {
+  return serverNow
+    ? new Date(parseUtcDateTime(serverNow).getTime() + (Date.now() - serverReceivedAt))
+    : new Date()
+}
+
+function getTodayYmd(
+  mode: "kyiv" | "local",
+  serverNow: string,
+  serverReceivedAt: number
+) {
+  const nowUTC = getCurrentUtc(serverNow, serverReceivedAt)
+  return mode === "kyiv" ? kyivYmd(nowUTC) : localYmd(nowUTC)
 }
 
 export const formatKyivDate = (utc: Date) => kyivYmd(utc)
@@ -169,38 +184,49 @@ export const fromUTC = (value: string, mode: "kyiv" | "local") =>
         : Intl.DateTimeFormat().resolvedOptions().timeZone,
   }).format(parseUtcDateTime(value))
 
-export const toUTC = (date: string, time: string) => {
+export const toUTC = (
+  date: string,
+  time: string,
+  mode: "kyiv" | "local"
+) => {
   const [y, m, d] = date.split("-").map(Number)
   const [h, min] = time.split(":").map(Number)
 
-  const probe = new Date(Date.UTC(y, m - 1, d, h, min))
+  const displayTimeZone =
+    mode === "kyiv"
+      ? "Europe/Kyiv"
+      : Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  const kyiv = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Kyiv",
+  const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: displayTimeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).formatToParts(probe)
+  }).formatToParts(probeUtc)
 
-  const get = (t: string) => Number(kyiv.find((v) => v.type === t)?.value || "0")
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || "0")
 
-  const ky = get("year")
-  const km = get("month")
-  const kd = get("day")
-  const kh = get("hour")
-  const kmin = get("minute")
+  const seenY = get("year")
+  const seenM = get("month")
+  const seenD = get("day")
+  const seenH = get("hour")
+  const seenMin = get("minute")
 
-  const delta =
-    (Date.UTC(y, m - 1, d, h, min) - Date.UTC(ky, km - 1, kd, kh, kmin)) / 60000
+  const desired = Date.UTC(y, m - 1, d, h, min)
+  const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+  const diff = desired - seen
 
-  return new Date(Date.UTC(y, m - 1, d, h, min) - delta * 60000)
+  return new Date(probeUtc.getTime() + diff)
     .toISOString()
     .replace("Z", "")
     .slice(0, 19)
 }
+
 
 function getDisplayYmd(value: string, mode: "kyiv" | "local") {
   const d = parseUtcDateTime(value)
@@ -268,7 +294,7 @@ export const getTimes = (mode: "kyiv" | "local", settings: OfficeSettings | null
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   return list.map((t) => {
-    const utc = toUTC("2000-01-01", t)
+    const utc = toUTC("2000-01-01", t, "kyiv")
     return new Intl.DateTimeFormat("en-GB", {
       timeZone: tz,
       hour: "2-digit",
@@ -289,8 +315,8 @@ export const getOfficeBounds = (mode: "kyiv" | "local", settings: OfficeSettings
   if (mode === "kyiv") return { start: startKyiv, end: endKyiv }
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const startUTC = toUTC("2000-01-01", settings.working_day_start)
-  const endUTC = toUTC("2000-01-01", settings.working_day_end)
+  const startUTC = toUTC("2000-01-01", settings.working_day_start, "kyiv")
+  const endUTC = toUTC("2000-01-01", settings.working_day_end, "kyiv")
 
   const s = new Intl.DateTimeFormat("en-GB", {
     timeZone: tz,
@@ -343,9 +369,7 @@ const nextSlot = (
           working_day_end: dayMeta.end,
         }).end
 
-  const nowUTC = serverNow
-    ? new Date(parseUtcDateTime(serverNow).getTime() + (Date.now() - serverReceivedAt))
-    : new Date()
+  const nowUTC = getCurrentUtc(serverNow, serverReceivedAt)
 
   const today = mode === "kyiv" ? kyivYmd(nowUTC) : localYmd(nowUTC)
 
@@ -397,10 +421,20 @@ export function useAppData() {
   const [serverNow, setServerNow] = useState("")
   const [serverReceivedAt, setServerReceivedAt] = useState(0)
 
-  const [selectedDate, setSelectedDate] = useState(localYmd(new Date()))
+  const [selectedDate, setSelectedDate] = useState("")
 
   const [timeMode, setTimeMode] = useState<"kyiv" | "local">(
     localStorage.getItem("timeMode") === "local" ? "local" : "kyiv"
+  )
+
+  const todayDate = useMemo(
+    () => getTodayYmd(timeMode, serverNow, serverReceivedAt),
+    [timeMode, serverNow, serverReceivedAt]
+  )
+
+  const nowUtcMs = useMemo(
+    () => getCurrentUtc(serverNow, serverReceivedAt).getTime(),
+    [serverNow, serverReceivedAt]
   )
 
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
@@ -489,9 +523,8 @@ export function useAppData() {
 
   useEffect(() => {
     if (!serverNow) return
-    const utc = parseUtcDateTime(serverNow)
-    setSelectedDate(timeMode === "kyiv" ? kyivYmd(utc) : localYmd(utc))
-  }, [timeMode, serverNow])
+    setSelectedDate(getTodayYmd(timeMode, serverNow, serverReceivedAt))
+  }, [timeMode, serverNow, serverReceivedAt])
 
   useEffect(() => {
     void initApp()
@@ -631,10 +664,7 @@ export function useAppData() {
 
       if (!privateOk) return
 
-      const initialDate =
-        timeMode === "kyiv"
-          ? kyivYmd(parseUtcDateTime(serverNow || new Date().toISOString().slice(0, 19)))
-          : localYmd(new Date())
+      const initialDate = getTodayYmd(timeMode, serverNow, serverReceivedAt)
 
       setSelectedDate(initialDate)
       await loadCalendarForDate(initialDate)
@@ -659,8 +689,8 @@ export function useAppData() {
     if (timeMode === "kyiv") return `${dayMeta.start} - ${dayMeta.end}`
 
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const sUTC = toUTC(selectedDate, dayMeta.start)
-    const eUTC = toUTC(selectedDate, dayMeta.end)
+    const sUTC = toUTC(selectedDate, dayMeta.start, "kyiv")
+    const eUTC = toUTC(selectedDate, dayMeta.end, "kyiv")
 
     const s = new Intl.DateTimeFormat("en-GB", {
       timeZone: tz,
@@ -682,17 +712,17 @@ export function useAppData() {
   const currentReservations = useMemo(
     () =>
       myReservations.filter(
-        (r) => r.status !== "cancelled" && parseUtcDateTime(r.end_at).getTime() > Date.now()
+        (r) => r.status !== "cancelled" && parseUtcDateTime(r.end_at).getTime() > nowUtcMs
       ),
-    [myReservations]
+    [myReservations, nowUtcMs]
   )
 
   const pastReservations = useMemo(
     () =>
       myReservations.filter(
-        (r) => r.status === "cancelled" || parseUtcDateTime(r.end_at).getTime() <= Date.now()
+        (r) => r.status === "cancelled" || parseUtcDateTime(r.end_at).getTime() <= nowUtcMs
       ),
-    [myReservations]
+    [myReservations, nowUtcMs]
   )
 
   const setShowModal = (v: boolean) => {
@@ -707,7 +737,7 @@ export function useAppData() {
         return
       }
 
-      const s = nextSlot(
+        const s = nextSlot(
         reservations,
         officeCalendar,
         officeSettings,
@@ -717,21 +747,35 @@ export function useAppData() {
         serverReceivedAt
       )
 
-      if (!s && !editing) {
-        setReserveError("No available time slots.")
-        return
-      }
-
       if (!editing) {
-        setStart(s)
+        const dayMeta = getEffectiveWorkingHours(selectedDate, officeSettings, officeCalendar)
+
+        const fallbackStart =
+          timeMode === "kyiv"
+            ? dayMeta.start
+            : getTimes(timeMode, {
+                ...officeSettings,
+                working_day_start: dayMeta.start,
+                working_day_end: dayMeta.end,
+              })[0] || ""
+
+        const initialStart = s || fallbackStart
+
+        setStart(initialStart)
 
         const slot = Number(
           officeSettings.slot_minutes ?? officeSettings.min_booking_minutes ?? 30
         )
 
-        setEnd(minutesToTime(mins(s) + slot))
-        setReserveError("")
+        setEnd(initialStart ? minutesToTime(mins(initialStart) + slot) : "")
+        setReserveError(
+          s
+            ? ""
+            : "No available time slots for this day. You can review the schedule, but booking is unavailable."
+        )
       }
+
+
     } else {
       setEditing(false)
       setEditingId(null)
@@ -806,10 +850,7 @@ export function useAppData() {
 
       setMyReservations([...(mineRes?.upcoming || []), ...(mineRes?.past || [])])
 
-      const activeDate =
-        timeMode === "kyiv"
-          ? kyivYmd(parseUtcDateTime(serverNow || new Date().toISOString().slice(0, 19)))
-          : localYmd(new Date())
+      const activeDate = getTodayYmd(timeMode, serverNow, serverReceivedAt)
 
       setSelectedDate(activeDate)
 
@@ -986,8 +1027,8 @@ export function useAppData() {
           room_id: Number(roomId),
           title: title.trim(),
           description: "",
-          start_at: toUTC(selectedDate, start),
-          end_at: toUTC(selectedDate, end),
+          start_at: toUTC(selectedDate, start, timeMode),
+          end_at: toUTC(selectedDate, end, timeMode),
         }),
       })
 
@@ -1068,10 +1109,8 @@ export function useAppData() {
       return
     }
 
-    const selectedUTC = parseUtcDateTime(toUTC(selectedDate, start))
-    const nowUTC = serverNow
-      ? new Date(parseUtcDateTime(serverNow).getTime() + (Date.now() - serverReceivedAt))
-      : new Date()
+    const selectedUTC = parseUtcDateTime(toUTC(selectedDate, start, timeMode))
+    const nowUTC = getCurrentUtc(serverNow, serverReceivedAt)
 
     if (selectedUTC <= nowUTC) {
       setReserveError("Cannot reserve past time.")
@@ -1087,8 +1126,8 @@ export function useAppData() {
         room_id: Number(roomId),
         title: clean,
         description: "",
-        start_at: toUTC(selectedDate, start),
-        end_at: toUTC(selectedDate, end),
+        start_at: toUTC(selectedDate, start, timeMode),
+        end_at: toUTC(selectedDate, end, timeMode),
       }),
     })
 
@@ -1116,7 +1155,7 @@ export function useAppData() {
 
   const formatDate = (v: string) => {
     if (!isYmd(v)) return v
-    const d = localDateFromYmd(v)
+    const d = utcDateFromYmd(v)
     return new Intl.DateTimeFormat("en-GB", {
       timeZone:
         timeMode === "kyiv"
@@ -1126,6 +1165,30 @@ export function useAppData() {
       day: "numeric",
       month: "long",
       year: "numeric",
+    }).format(d)
+  }
+
+  const formatWeekdayShort = (v: string) => {
+    if (!isYmd(v)) return v
+    const d = utcDateFromYmd(v)
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone:
+        timeMode === "kyiv"
+          ? "Europe/Kyiv"
+          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      weekday: "short",
+    }).format(d)
+  }
+
+  const formatDayNumber = (v: string) => {
+    if (!isYmd(v)) return v
+    const d = utcDateFromYmd(v)
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone:
+        timeMode === "kyiv"
+          ? "Europe/Kyiv"
+          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      day: "2-digit",
     }).format(d)
   }
 
@@ -1162,6 +1225,7 @@ export function useAppData() {
     localTime,
     serverNow,
     serverReceivedAt,
+    nowUtcMs,
 
     selectedDate,
     setSelectedDate,
@@ -1225,6 +1289,10 @@ export function useAppData() {
     formatDate,
     formatDateTime,
     workingHoursText,
+
+    todayDate,
+    formatWeekdayShort,
+    formatDayNumber,
 
     timeMode,
     setTimeMode,
