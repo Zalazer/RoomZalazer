@@ -81,64 +81,80 @@ export default function ReservationModal({
         return acc
       }, {} as Record<string, string>)
 
-  const roomReservations = reservations
-    .filter((r) => {
-      const d = dateOf(r.start_at)
-      const ymd = `${d.year}-${d.month}-${d.day}`
-
-      return (
-        r.room_id === Number(roomId) &&
-        r.status !== "cancelled" &&
-        ymd === selectedDate
-      )
-    })
-    .sort(
-      (a, b) =>
-        parseUtc(a.start_at).getTime() -
-        parseUtc(b.start_at).getTime()
-    )
-
   const selectedRoom = rooms.find((r) => String(r.id) === roomId)
 
-  const startTimes = times.length > 1 ? times.slice(0, -1) : times
+  const getRoomReservations = (targetRoomId: string) =>
+    reservations
+      .filter((r) => {
+        const d = dateOf(r.start_at)
+        const ymd = `${d.year}-${d.month}-${d.day}`
+
+        return (
+          r.room_id === Number(targetRoomId) &&
+          r.status !== "cancelled" &&
+          ymd === selectedDate
+        )
+      })
+      .sort(
+        (a, b) =>
+          parseUtc(a.start_at).getTime() -
+          parseUtc(b.start_at).getTime()
+      )
+
+  const getNextBusyStart = (roomReservations: Reservation[], startValue: string) =>
+    roomReservations
+      .map((r) => M(fmt(r.start_at)))
+      .filter((v) => v > M(startValue))
+      .sort((a, b) => a - b)[0]
+
+  const getAvailableEndTimes = (roomReservations: Reservation[], startValue: string) => {
+    if (!isHm(startValue)) return []
+
+    const nextBusyValue = getNextBusyStart(roomReservations, startValue)
+
+    return times.filter((t) => {
+      if (!isHm(t)) return false
+
+      const s = M(startValue)
+      const e = M(t)
+
+      return e > s && (nextBusyValue === undefined || e <= nextBusyValue)
+    })
+  }
+
+  const getAvailableStartTimes = (roomReservations: Reservation[]) =>
+    times.filter((t) => {
+      if (!isHm(t)) return false
+
+      const m = M(t)
+
+      const occupied = roomReservations.some((r) => {
+        const s = M(fmt(r.start_at))
+        const e = M(fmt(r.end_at))
+        return m >= s && m < e
+      })
+
+      if (occupied) return false
+
+      return getAvailableEndTimes(roomReservations, t).length > 0
+    })
+
+  const roomReservations = roomId ? getRoomReservations(roomId) : []
 
   const availableStartTimes =
     !roomId || !times.length
-      ? startTimes
-      : startTimes.filter((t) => {
-          const m = M(t)
-
-          return !roomReservations.some((r) => {
-            const s = M(fmt(r.start_at))
-            const e = M(fmt(r.end_at))
-            return m >= s && m < e
-          })
-        })
+      ? times.filter(isHm)
+      : getAvailableStartTimes(roomReservations)
 
   const safeStart =
     isHm(start) && availableStartTimes.includes(start)
       ? start
       : availableStartTimes[0] || ""
 
-  const nextBusy =
-    isHm(safeStart)
-      ? roomReservations
-          .map((r) => M(fmt(r.start_at)))
-          .filter((v) => v > M(safeStart))
-          .sort((a, b) => a - b)[0]
-      : undefined
-
   const availableEndTimes =
-    !isHm(safeStart)
+    !roomId || !isHm(safeStart)
       ? []
-      : times.filter((t) => {
-          if (!isHm(t)) return false
-
-          const s = M(safeStart)
-          const e = M(t)
-
-          return e > s && (nextBusy === undefined || e <= nextBusy)
-        })
+      : getAvailableEndTimes(roomReservations, safeStart)
 
   const safeEnd =
     isHm(end) && availableEndTimes.includes(end)
@@ -178,56 +194,28 @@ export default function ReservationModal({
 
             const nextRoomId = e.target.value
 
-            if (!nextRoomId) return
+            if (!nextRoomId) {
+              setStart("")
+              setEnd("")
+              return
+            }
 
-            const nextRoomReservations = reservations
-              .filter((r) => {
-                const d = dateOf(r.start_at)
-                const ymd = `${d.year}-${d.month}-${d.day}`
-
-                return (
-                  r.room_id === Number(nextRoomId) &&
-                  r.status !== "cancelled" &&
-                  ymd === selectedDate
-                )
-              })
-              .sort(
-                (a, b) =>
-                  parseUtc(a.start_at).getTime() -
-                  parseUtc(b.start_at).getTime()
-              )
-
-            const nextAvailableStarts = (times.length > 1 ? times.slice(0, -1) : times).filter(
-              (t) => {
-                const m = M(t)
-
-                return !nextRoomReservations.some((r) => {
-                  const s = M(fmt(r.start_at))
-                  const e = M(fmt(r.end_at))
-                  return m >= s && m < e
-                })
-              }
-            )
+            const nextRoomReservations = getRoomReservations(nextRoomId)
+            const nextAvailableStarts = getAvailableStartTimes(nextRoomReservations)
 
             if (nextAvailableStarts.length) {
               const nextStart = nextAvailableStarts[0]
               setStart(nextStart)
 
-              const nextNextBusy = nextRoomReservations
-                .map((r) => M(fmt(r.start_at)))
-                .filter((v) => v > M(nextStart))
-                .sort((a, b) => a - b)[0]
+              const nextAvailableEnds = getAvailableEndTimes(
+                nextRoomReservations,
+                nextStart
+              )
 
-              const nextAvailableEnds = times.filter((t) => {
-                if (!isHm(t)) return false
-                const s = M(nextStart)
-                const e = M(t)
-                return e > s && (nextNextBusy === undefined || e <= nextNextBusy)
-              })
-
-              if (nextAvailableEnds.length) {
-                setEnd(nextAvailableEnds[0])
-              }
+              setEnd(nextAvailableEnds[0] || "")
+            } else {
+              setStart("")
+              setEnd("")
             }
           }}
         >
@@ -287,20 +275,10 @@ export default function ReservationModal({
         <select
           value={safeStart}
           onChange={(e) => {
-            setStart(e.target.value)
-
             const nextStartValue = e.target.value
-            const nextBusyValue = roomReservations
-              .map((r) => M(fmt(r.start_at)))
-              .filter((v) => v > M(nextStartValue))
-              .sort((a, b) => a - b)[0]
+            setStart(nextStartValue)
 
-            const nextEnds = times.filter((t) => {
-              if (!isHm(t)) return false
-              const s = M(nextStartValue)
-              const ee = M(t)
-              return ee > s && (nextBusyValue === undefined || ee <= nextBusyValue)
-            })
+            const nextEnds = getAvailableEndTimes(roomReservations, nextStartValue)
 
             if (!nextEnds.includes(end)) {
               setEnd(nextEnds[0] || "")

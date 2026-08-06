@@ -25,6 +25,37 @@ function toYmd(date: Date, zone: string) {
 
 const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
 
+function toUtcFromDisplay(date: string, time: string, zone: string) {
+  const [y, m, d] = date.split("-").map(Number)
+  const [h, min] = time.split(":").map(Number)
+
+  const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(probeUtc)
+
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || "0")
+
+  const seenY = get("year")
+  const seenM = get("month")
+  const seenD = get("day")
+  const seenH = get("hour")
+  const seenMin = get("minute")
+
+  const desired = Date.UTC(y, m - 1, d, h, min)
+  const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+  const diff = desired - seen
+
+  return new Date(probeUtc.getTime() + diff)
+}
+
 export default function RoomDetailsModal({
   room,
   reservations,
@@ -60,6 +91,8 @@ export default function RoomDetailsModal({
       (a, b) =>
         parseUtc(a.start_at).getTime() - parseUtc(b.start_at).getTime()
     )
+
+  const visibleTimes = times.length > 1 ? times.slice(0, -1) : times
 
   const floorSuffix =
     room.floor === 1 ? "st" : room.floor === 2 ? "nd" : room.floor === 3 ? "rd" : "th"
@@ -102,11 +135,13 @@ export default function RoomDetailsModal({
           Viewing in {timeMode === "kyiv" ? "Kyiv time" : "your local time"}
         </div>
 
-        {times.map((time) => {
+        {visibleTimes.map((time) => {
+          const slotUtcMs = toUtcFromDisplay(selectedDate, time, zone).getTime()
+
           const item = list.find((r) => {
-            const start = fmt(r.start_at)
-            const end = fmt(r.end_at)
-            return time >= start && time < end
+            const startMs = parseUtc(r.start_at).getTime()
+            const endMs = parseUtc(r.end_at).getTime()
+            return slotUtcMs >= startMs && slotUtcMs < endMs
           })
 
           return (

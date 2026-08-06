@@ -305,7 +305,13 @@ function getEffectiveWorkingHours(
   }
 }
 
-export const getTimes = (mode: "kyiv" | "local", settings: OfficeSettings | null) => {
+
+
+export const getTimes = (
+  mode: "kyiv" | "local",
+  settings: OfficeSettings | null,
+  selectedDate?: string
+) => {
   if (!settings) return []
 
   const slot = Number(settings.slot_minutes)
@@ -317,7 +323,7 @@ export const getTimes = (mode: "kyiv" | "local", settings: OfficeSettings | null
 
   for (
     let m = mins(settings.working_day_start);
-    m < mins(settings.working_day_end);
+    m <= mins(settings.working_day_end);
     m += slot
   ) {
     list.push(minutesToTime(m))
@@ -327,8 +333,10 @@ export const getTimes = (mode: "kyiv" | "local", settings: OfficeSettings | null
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
+  const anchorDate = selectedDate || kyivYmd(getCurrentUtc("", 0))
+
   return list.map((t) => {
-    const utc = toUTC("2000-01-01", t, "kyiv")
+    const utc = toUTC(anchorDate, t, "kyiv")
     return new Intl.DateTimeFormat("en-GB", {
       timeZone: tz,
       hour: "2-digit",
@@ -338,7 +346,13 @@ export const getTimes = (mode: "kyiv" | "local", settings: OfficeSettings | null
   })
 }
 
-export const getOfficeBounds = (mode: "kyiv" | "local", settings: OfficeSettings | null) => {
+
+
+export const getOfficeBounds = (
+  mode: "kyiv" | "local",
+  settings: OfficeSettings | null,
+  selectedDate?: string
+) => {
   if (!settings) {
     return { start: 0, end: 0 }
   }
@@ -349,8 +363,11 @@ export const getOfficeBounds = (mode: "kyiv" | "local", settings: OfficeSettings
   if (mode === "kyiv") return { start: startKyiv, end: endKyiv }
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const startUTC = toUTC("2000-01-01", settings.working_day_start, "kyiv")
-  const endUTC = toUTC("2000-01-01", settings.working_day_end, "kyiv")
+
+  const anchorDate = selectedDate || kyivYmd(getCurrentUtc("", 0))
+
+  const startUTC = toUTC(anchorDate, settings.working_day_start, "kyiv")
+  const endUTC = toUTC(anchorDate, settings.working_day_end, "kyiv")
 
   const s = new Intl.DateTimeFormat("en-GB", {
     timeZone: tz,
@@ -369,6 +386,9 @@ export const getOfficeBounds = (mode: "kyiv" | "local", settings: OfficeSettings
   return { start: mins(s), end: mins(e) }
 }
 
+
+
+
 const nextSlot = (
   reservations: Reservation[],
   calendar: OfficeCalendarDay[],
@@ -380,28 +400,43 @@ const nextSlot = (
 ) => {
   if (!settings || !isYmd(date)) return ""
 
-  const dayMeta = getEffectiveWorkingHours(date, settings, calendar)
+  const officeDate = getOfficeDateForSelectedDate(date, mode)
+  const dayMeta = getEffectiveWorkingHours(officeDate, settings, calendar)
 
   if (dayMeta.closed) return ""
   if (!isHm(dayMeta.start) || !isHm(dayMeta.end)) return ""
 
-  let dayStart =
+  const tz =
+    mode === "kyiv"
+      ? "Europe/Kyiv"
+      : Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  const dayStartUTC = toUTC(officeDate, dayMeta.start, "kyiv")
+  const dayEndUTC = toUTC(officeDate, dayMeta.end, "kyiv")
+
+  const dayStart =
     mode === "kyiv"
       ? mins(dayMeta.start)
-      : getOfficeBounds("local", {
-          ...settings,
-          working_day_start: dayMeta.start,
-          working_day_end: dayMeta.end,
-        }).start
+      : mins(
+          new Intl.DateTimeFormat("en-GB", {
+            timeZone: tz,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(parseUtcDateTime(dayStartUTC))
+        )
 
-  let dayEnd =
+  const dayEnd =
     mode === "kyiv"
       ? mins(dayMeta.end)
-      : getOfficeBounds("local", {
-          ...settings,
-          working_day_start: dayMeta.start,
-          working_day_end: dayMeta.end,
-        }).end
+      : mins(
+          new Intl.DateTimeFormat("en-GB", {
+            timeZone: tz,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(parseUtcDateTime(dayEndUTC))
+        )
 
   const nowUTC = getCurrentUtc(serverNow, serverReceivedAt)
 
@@ -410,7 +445,18 @@ const nextSlot = (
   let slot = dayStart
 
   if (date === today) {
-    const current = mins(mode === "kyiv" ? kyivHm(nowUTC) : hmFromDate(nowUTC))
+    const current =
+      mode === "kyiv"
+        ? mins(kyivHm(nowUTC))
+        : mins(
+            new Intl.DateTimeFormat("en-GB", {
+              timeZone: tz,
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).format(nowUTC)
+          )
+
     const slotSize = Number(settings.slot_minutes || settings.min_booking_minutes)
 
     if (!slotSize) return ""
@@ -419,10 +465,30 @@ const nextSlot = (
   }
 
   const busy = reservations
-    .filter((r) => getDisplayYmd(r.start_at, mode) === date && r.status !== "cancelled")
+    .filter((r) => {
+      const rOfficeDate = getOfficeDateForSelectedDate(
+        getDisplayYmd(r.start_at, mode),
+        mode
+      )
+      return rOfficeDate === officeDate && r.status !== "cancelled"
+    })
     .map((r) => ({
-      s: mins(getDisplayHm(r.start_at, mode)),
-      e: mins(getDisplayHm(r.end_at, mode)),
+      s: mins(
+        new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(parseUtcDateTime(r.start_at))
+      ),
+      e: mins(
+        new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(parseUtcDateTime(r.end_at))
+      ),
     }))
     .sort((a, b) => a.s - b.s)
 
@@ -434,6 +500,8 @@ const nextSlot = (
 
   return ""
 }
+
+
 
 export function useAppData() {
   const [token, setToken] = useState(localStorage.getItem("token") || "")
@@ -724,8 +792,9 @@ export function useAppData() {
     if (timeMode === "kyiv") return `${dayMeta.start} - ${dayMeta.end}`
 
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const sUTC = toUTC(selectedDate, dayMeta.start, "kyiv")
-    const eUTC = toUTC(selectedDate, dayMeta.end, "kyiv")
+
+    const sUTC = toUTC(officeDate, dayMeta.start, "kyiv")
+    const eUTC = toUTC(officeDate, dayMeta.end, "kyiv")
 
     const s = new Intl.DateTimeFormat("en-GB", {
       timeZone: tz,
@@ -786,14 +855,19 @@ export function useAppData() {
         const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
         const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
 
-        const fallbackStart =
-          timeMode === "kyiv"
-            ? dayMeta.start
-            : getTimes(timeMode, {
-                ...officeSettings,
-                working_day_start: dayMeta.start,
-                working_day_end: dayMeta.end,
-              })[0] || ""
+const fallbackStart =
+  timeMode === "kyiv"
+    ? dayMeta.start
+    : getTimes(
+        timeMode,
+        {
+          ...officeSettings,
+          working_day_start: dayMeta.start,
+          working_day_end: dayMeta.end,
+        },
+        selectedDate
+      )[0] || ""
+
 
         const initialStart = s || fallbackStart
 
@@ -1133,13 +1207,17 @@ export function useAppData() {
     }
 
     const effectiveBounds =
-      timeMode === "kyiv"
-        ? { start: mins(dayMeta.start), end: mins(dayMeta.end) }
-        : getOfficeBounds(timeMode, {
-            ...officeSettings,
-            working_day_start: dayMeta.start,
-            working_day_end: dayMeta.end,
-          })
+  timeMode === "kyiv"
+    ? { start: mins(dayMeta.start), end: mins(dayMeta.end) }
+    : getOfficeBounds(
+        timeMode,
+        {
+          ...officeSettings,
+          working_day_start: dayMeta.start,
+          working_day_end: dayMeta.end,
+        },
+        selectedDate
+      )
 
     if (!isWithinWorkingBounds(s, e, effectiveBounds.start, effectiveBounds.end)) {
       setReserveError(`Working hours are ${workingHoursText}.`)
@@ -1334,8 +1412,8 @@ export function useAppData() {
     timeMode,
     setTimeMode,
 
-    TIMES: getTimes(timeMode, officeSettings),
-    getTimes: (mode: "kyiv" | "local") => getTimes(mode, officeSettings),
+TIMES: getTimes(timeMode, officeSettings, selectedDate),
+getTimes: (mode: "kyiv" | "local") => getTimes(mode, officeSettings, selectedDate),
 
     officeSettings,
     officeCalendar,

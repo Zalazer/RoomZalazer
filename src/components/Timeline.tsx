@@ -8,9 +8,6 @@ type Props = {
   timeMode: "kyiv" | "local"
 }
 
-const M = (v: string) =>
-  Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
-
 function toYmd(date: Date, zone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: zone,
@@ -38,14 +35,6 @@ export default function Timeline({
       ? "Europe/Kyiv"
       : Intl.DateTimeFormat().resolvedOptions().timeZone
 
-  const fmt = (v: string) =>
-    new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: zone,
-    }).format(parseUtc(v))
-
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const roomReservations = reservations.filter(
@@ -55,14 +44,78 @@ export default function Timeline({
       dateOf(r.start_at) === selectedDate
   )
 
+  const visibleTimes = times.length > 1 ? times.slice(0, -1) : times
+
   function slotClass(slot: string) {
-    const slotMinutes = M(slot)
+    const slotUtcMs = roomReservations.length
+      ? roomReservations
+          .map((r) => {
+            const start = parseUtc(r.start_at)
+            const localDate = new Intl.DateTimeFormat("en-CA", {
+              timeZone: zone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            })
+              .formatToParts(start)
+              .reduce((acc, part) => {
+                if (part.type !== "literal") acc[part.type] = part.value
+                return acc
+              }, {} as Record<string, string>)
+
+            const ymd = `${localDate.year}-${localDate.month}-${localDate.day}`
+            const [hour, minute] = slot.split(":").map(Number)
+
+            const probeUtc = new Date(Date.UTC(
+              Number(ymd.slice(0, 4)),
+              Number(ymd.slice(5, 7)) - 1,
+              Number(ymd.slice(8, 10)),
+              hour,
+              minute,
+              0
+            ))
+
+            const parts = new Intl.DateTimeFormat("en-US", {
+              timeZone: zone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).formatToParts(probeUtc)
+
+            const get = (type: string) =>
+              Number(parts.find((p) => p.type === type)?.value || "0")
+
+            const seenY = get("year")
+            const seenM = get("month")
+            const seenD = get("day")
+            const seenH = get("hour")
+            const seenMin = get("minute")
+
+            const desired = Date.UTC(
+              Number(ymd.slice(0, 4)),
+              Number(ymd.slice(5, 7)) - 1,
+              Number(ymd.slice(8, 10)),
+              hour,
+              minute
+            )
+
+            const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+            const diff = desired - seen
+
+            return probeUtc.getTime() + diff
+          })[0]
+      : null
+
+    if (slotUtcMs === null) return "tf"
 
     for (const reservation of roomReservations) {
-      const startMinutes = M(fmt(reservation.start_at))
-      const endMinutes = M(fmt(reservation.end_at))
+      const startMs = parseUtc(reservation.start_at).getTime()
+      const endMs = parseUtc(reservation.end_at).getTime()
 
-      if (slotMinutes >= startMinutes && slotMinutes < endMinutes) {
+      if (slotUtcMs >= startMs && slotUtcMs < endMs) {
         return "tr"
       }
     }
@@ -72,7 +125,7 @@ export default function Timeline({
 
   return (
     <div className="timeline">
-      {times.map((slot) => (
+      {visibleTimes.map((slot) => (
         <div
           key={slot}
           className={`t ${slotClass(slot)}`}
