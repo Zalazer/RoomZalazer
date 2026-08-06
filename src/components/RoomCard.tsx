@@ -59,12 +59,25 @@ export default function RoomCard({
       timeZone: zone,
     }).format(parseUtc(v))
 
-  const roomReservations = reservations.filter(
-    (r) =>
-      r.room_id === room.id &&
-      r.status !== "cancelled" &&
-      dateOf(r.start_at) === selectedDate
-  )
+  const fmtDate = (date: Date) =>
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: zone,
+    }).format(date)
+
+  const roomReservations = reservations
+    .filter(
+      (r) =>
+        r.room_id === room.id &&
+        r.status !== "cancelled" &&
+        dateOf(r.start_at) === selectedDate
+    )
+    .sort(
+      (a, b) =>
+        parseUtc(a.start_at).getTime() - parseUtc(b.start_at).getTime()
+    )
 
   const active = roomReservations.find((r) => {
     const s = parseUtc(r.start_at).getTime()
@@ -72,17 +85,32 @@ export default function RoomCard({
     return nowUtcMs >= s && nowUtcMs < e
   })
 
+  let busyUntilMs: number | null = null
+
+  if (active) {
+    const activeStartMs = parseUtc(active.start_at).getTime()
+    busyUntilMs = parseUtc(active.end_at).getTime()
+
+    for (const reservation of roomReservations) {
+      const startMs = parseUtc(reservation.start_at).getTime()
+      const endMs = parseUtc(reservation.end_at).getTime()
+
+      if (startMs < activeStartMs) continue
+
+      if (startMs <= busyUntilMs) {
+        busyUntilMs = Math.max(busyUntilMs, endMs)
+      }
+    }
+  }
+
   const officeEnd = officeSettings?.working_day_end ?? ""
 
-  const nextUpcoming = roomReservations
-    .filter((r) => parseUtc(r.start_at).getTime() > nowUtcMs)
-    .sort(
-      (a, b) =>
-        parseUtc(a.start_at).getTime() - parseUtc(b.start_at).getTime()
-    )[0]
+  const nextUpcoming = roomReservations.find(
+    (r) => parseUtc(r.start_at).getTime() > nowUtcMs
+  )
 
   const statusText = active
-    ? `Busy till ${fmt(active.end_at)}`
+    ? `Busy till ${fmtDate(new Date(busyUntilMs!))}`
     : nextUpcoming
     ? `Free till ${fmt(nextUpcoming.start_at)}`
     : officeEnd

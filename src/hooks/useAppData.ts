@@ -96,6 +96,28 @@ const mins = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
 const minutesToTime = (v: number) =>
   `${pad(Math.floor(v / 60))}:${pad(v % 60)}`
 
+
+function isWithinWorkingBounds(
+  startMinutes: number,
+  endMinutes: number,
+  boundsStart: number,
+  boundsEnd: number
+) {
+  if (boundsEnd > boundsStart) {
+    return startMinutes >= boundsStart && endMinutes <= boundsEnd
+  }
+
+  const normalize = (value: number) =>
+    value < boundsStart ? value + 1440 : value
+
+  const s = normalize(startMinutes)
+  const e = normalize(endMinutes)
+  const endBound = boundsEnd + 1440
+
+  return s >= boundsStart && e <= endBound && e > s
+}
+
+
 function parseUtcDateTime(value: string) {
   const normalized = String(value || "").replace(" ", "T")
   return new Date(`${normalized}Z`)
@@ -236,6 +258,18 @@ function getDisplayYmd(value: string, mode: "kyiv" | "local") {
 function getDisplayHm(value: string, mode: "kyiv" | "local") {
   return fromUTC(value, mode)
 }
+
+function getOfficeDateForSelectedDate(
+  selectedDate: string,
+  mode: "kyiv" | "local"
+) {
+  if (!isYmd(selectedDate)) return selectedDate
+  if (mode === "kyiv") return selectedDate
+
+  const localMiddayUtc = toUTC(selectedDate, "12:00", "local")
+  return kyivYmd(parseUtcDateTime(localMiddayUtc))
+}
+
 
 function getCalendarDay(calendar: OfficeCalendarDay[], selectedDate: string) {
   return calendar.find((v) => v.date === selectedDate) || null
@@ -681,7 +715,8 @@ export function useAppData() {
   const workingHoursText = useMemo(() => {
     if (!officeSettings || !selectedDate || !isYmd(selectedDate)) return ""
 
-    const dayMeta = getEffectiveWorkingHours(selectedDate, officeSettings, officeCalendar)
+    const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
+    const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
 
     if (dayMeta.closed) return "Closed"
     if (!dayMeta.start || !dayMeta.end) return ""
@@ -748,7 +783,8 @@ export function useAppData() {
       )
 
       if (!editing) {
-        const dayMeta = getEffectiveWorkingHours(selectedDate, officeSettings, officeCalendar)
+        const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
+        const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
 
         const fallbackStart =
           timeMode === "kyiv"
@@ -1088,7 +1124,8 @@ export function useAppData() {
       return
     }
 
-    const dayMeta = getEffectiveWorkingHours(selectedDate, officeSettings, officeCalendar)
+    const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
+    const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
 
     if (dayMeta.closed) {
       setReserveError("Office is closed on selected day.")
@@ -1104,7 +1141,7 @@ export function useAppData() {
             working_day_end: dayMeta.end,
           })
 
-    if (s < effectiveBounds.start || e > effectiveBounds.end) {
+    if (!isWithinWorkingBounds(s, e, effectiveBounds.start, effectiveBounds.end)) {
       setReserveError(`Working hours are ${workingHoursText}.`)
       return
     }
