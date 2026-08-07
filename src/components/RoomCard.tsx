@@ -10,7 +10,7 @@ type Props = {
   officeSettings: any
   nowUtcMs: number
   onClick: () => void
-  userId?: number | null
+  myReservationIds?: Set<number>
 }
 
 const toYmd = (date: Date, zone: string) => {
@@ -81,7 +81,7 @@ export default function RoomCard({
   officeSettings,
   nowUtcMs,
   onClick,
-  userId = null,
+  myReservationIds,
 }: Props) {
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
@@ -251,7 +251,7 @@ export default function RoomCard({
         selectedDate={selectedDate}
         timeMode={timeMode}
         times={times}
-        userId={userId}
+        myReservationIds={myReservationIds}
       />
 
       {room.description && <div className="desc">{room.description}</div>}

@@ -8,7 +8,7 @@ type Props = {
   times: string[]
   onClose: () => void
   onCreate: () => void
-  userId?: number | null
+  myReservationIds?: Set<number>
 }
 
 function toYmd(date: Date, zone: string) {
@@ -58,17 +58,6 @@ function toUtcFromDisplay(date: string, time: string, zone: string) {
   return new Date(probeUtc.getTime() + diff)
 }
 
-const normalizeId = (value: unknown) => {
-  if (value == null || value === "") return null
-  const normalized = Number(value)
-  return Number.isFinite(normalized) ? normalized : null
-}
-
-const normalizeText = (value: unknown) =>
-  String(value ?? "")
-    .trim()
-    .toLowerCase()
-
 const cutSingleLine = (value: unknown, max = 56) => {
   const text = String(value ?? "").trim()
   if (!text) return ""
@@ -83,7 +72,7 @@ export default function RoomDetailsModal({
   times,
   onClose,
   onCreate,
-  userId = null,
+  myReservationIds,
 }: Props) {
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -91,9 +80,6 @@ export default function RoomDetailsModal({
     timeMode === "kyiv"
       ? "Europe/Kyiv"
       : localZone
-
-  const normalizedUserId = normalizeId(userId)
-  const currentUserName = normalizeText((reservations.find(Boolean) as any)?.current_user_name)
 
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
@@ -163,26 +149,7 @@ export default function RoomDetailsModal({
 
   const isOwnReservation = (reservation: Reservation | undefined) => {
     if (!reservation) return false
-
-    const reservationAny = reservation as any
-    const ownerName = normalizeText(reservationAny.user_name)
-
-    const byId =
-      normalizedUserId != null &&
-      [
-        reservationAny.user_id,
-        reservationAny.created_by,
-        reservationAny.user?.id,
-      ]
-        .map(normalizeId)
-        .some((value) => value === normalizedUserId)
-
-    const byName =
-      !!currentUserName &&
-      !!ownerName &&
-      ownerName === currentUserName
-
-    return byId || byName
+    return myReservationIds?.has(reservation.id) ?? false
   }
 
   return (
@@ -259,6 +226,12 @@ export default function RoomDetailsModal({
               ? [ownerName, meetingTitle].filter(Boolean).join(" — ") || "Reserved"
               : "FREE"
 
+            const fullLabel = item
+              ? [String(item?.user_name || "").trim(), String(item?.title || "").trim()]
+                  .filter(Boolean)
+                  .join(" — ")
+              : "FREE"
+
             return (
               <div
                 key={time}
@@ -278,7 +251,7 @@ export default function RoomDetailsModal({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  title={item ? [String(item?.user_name || "").trim(), String(item?.title || "").trim()].filter(Boolean).join(" — ") : "FREE"}
+                  title={fullLabel}
                 >
                   {label}
                 </span>

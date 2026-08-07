@@ -6,7 +6,7 @@ type Props = {
   selectedDate: string
   times: string[]
   timeMode: "kyiv" | "local"
-  userId?: number | null
+  myReservationIds?: Set<number>
 }
 
 function toYmd(date: Date, zone: string) {
@@ -18,7 +18,6 @@ function toYmd(date: Date, zone: string) {
   }).formatToParts(date)
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
-
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
@@ -59,26 +58,18 @@ function toUtcFromZone(date: string, time: string, zone: string) {
   return new Date(probeUtc.getTime() + diff)
 }
 
-const normalizeId = (value: unknown) => {
-  if (value == null || value === "") return null
-  const normalized = Number(value)
-  return Number.isFinite(normalized) ? normalized : null
-}
-
 export default function Timeline({
   roomId,
   reservations,
   selectedDate,
   times,
   timeMode,
-  userId = null,
+  myReservationIds,
 }: Props) {
   const zone =
     timeMode === "kyiv"
       ? "Europe/Kyiv"
       : Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  const normalizedUserId = normalizeId(userId)
 
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
@@ -92,17 +83,7 @@ export default function Timeline({
   const visibleTimes = times.length > 1 ? times.slice(0, -1) : times
 
   const isOwnReservation = (reservation: Reservation) => {
-    if (normalizedUserId == null) return false
-
-    const reservationAny = reservation as any
-
-    return [
-      reservationAny.user_id,
-      reservationAny.created_by,
-      reservationAny.user?.id,
-    ]
-      .map(normalizeId)
-      .some((value) => value === normalizedUserId)
+    return myReservationIds?.has(reservation.id) ?? false
   }
 
   const slotClass = (slot: string) => {

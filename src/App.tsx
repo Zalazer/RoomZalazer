@@ -137,10 +137,10 @@ export default function App() {
       ? a.nowUtcMs
       : Date.now()
 
-  const normalizedUserId =
-    a.user?.id != null && Number.isFinite(Number(a.user.id))
-      ? Number(a.user.id)
-      : null
+  const myReservationIds = useMemo(
+    () => new Set((a.myReservations ?? []).map((r) => r.id)),
+    [a.myReservations]
+  )
 
   const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
   const todayInKyiv = formatYmdInZone(new Date(safeNowUtcMs), "Europe/Kyiv")
@@ -408,7 +408,7 @@ export default function App() {
             officeSettings={a.officeSettings}
             nowUtcMs={safeNowUtcMs}
             onClick={() => a.setSelectedRoom(room)}
-            userId={normalizedUserId}
+            myReservationIds={myReservationIds}
           />
         ))}
 
@@ -474,7 +474,7 @@ export default function App() {
           selectedDate={a.selectedDate}
           timeMode={a.timeMode}
           times={a.TIMES}
-          userId={normalizedUserId}
+          myReservationIds={myReservationIds}
           onClose={() => a.setSelectedRoom(null)}
           onCreate={() => {
             if (isCreateDisabledForSelectedDay) return

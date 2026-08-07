@@ -1310,6 +1310,7 @@ export function useAppData() {
 
     currentReservations,
     pastReservations,
+    myReservations,
 
     login,
     register,
