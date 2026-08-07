@@ -58,7 +58,10 @@ const toUtcFromZone = (date: string, time: string, zone: string) => {
   return new Date(probeUtc.getTime() + diff)
 }
 
-const getOfficeDateForSelectedDate = (selectedDate: string, timeMode: "kyiv" | "local") => {
+const getOfficeDateForSelectedDate = (
+  selectedDate: string,
+  timeMode: "kyiv" | "local"
+) => {
   if (timeMode === "kyiv") return selectedDate
 
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -152,18 +155,47 @@ export default function RoomCard({
   }
 
   const officeEnd = officeSettings?.working_day_end ?? ""
+  const todayInKyiv = toYmd(new Date(nowUtcMs), "Europe/Kyiv")
 
-  const nextUpcoming = roomReservations.find(
-    (r) => parseUtc(r.start_at).getTime() > nowUtcMs
-  )
+  const officeEndUtcMs =
+    officeEnd ? toUtcFromZone(officeDate, officeEnd, "Europe/Kyiv").getTime() : null
 
-  const statusText = active
-    ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
-    : nextUpcoming
-    ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
-    : officeEnd
-    ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
-    : "Available"
+  const isEndedDay =
+    officeDate < todayInKyiv ||
+    (officeDate === todayInKyiv &&
+      officeEndUtcMs != null &&
+      nowUtcMs >= officeEndUtcMs)
+
+  const nextUpcoming = roomReservations.find((r) => {
+    const startMs = parseUtc(r.start_at).getTime()
+    return startMs > nowUtcMs
+  })
+
+  const statusText = isEndedDay
+    ? "This working day has ended."
+    : active
+      ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
+      : nextUpcoming
+        ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
+        : officeEnd
+          ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
+          : "Available"
+
+  const statusClass = active
+    ? "reserved"
+    : isEndedDay
+      ? "ended"
+      : "available"
+
+  const windowsValue =
+    room.windows != null ? String(room.windows).trim() : ""
+
+  const metaParts = [
+    floorLabel(room.floor),
+    `${room.capacity} seats`,
+    typeof room.area === "number" && room.area > 0 ? `${room.area} m²` : null,
+    windowsValue && windowsValue !== "0" ? `Windows: ${windowsValue}` : null,
+  ].filter(Boolean)
 
   return (
     <div
@@ -172,13 +204,19 @@ export default function RoomCard({
     >
       <div className="room-head">
         <div className="room-name">
-          {room.name}
-          {" · "}
-          {floorLabel(room.floor)}
-          {" · Capacity "}
-          {room.capacity}
-          {room.area != null && ` · ${room.area} m²`}
-          {room.windows && ` · ${room.windows}`}
+          <div
+            className="room-title"
+            title={room.name}
+          >
+            {room.name}
+          </div>
+
+          <div
+            className="room-meta-line"
+            title={metaParts.join(" · ")}
+          >
+            {metaParts.join(" · ")}
+          </div>
         </div>
       </div>
 
@@ -201,11 +239,8 @@ export default function RoomCard({
       )}
 
       <div
-        className={`small ${active ? "reserved" : "available"}`}
-        style={{
-          fontWeight: 600,
-          color: active ? "#ffc0c0" : "#97ffbd",
-        }}
+        className={`small ${statusClass}`}
+        style={{ fontWeight: 600 }}
       >
         {statusText}
       </div>

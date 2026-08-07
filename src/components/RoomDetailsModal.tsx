@@ -65,10 +65,12 @@ export default function RoomDetailsModal({
   onClose,
   onCreate,
 }: Props) {
+  const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
   const zone =
     timeMode === "kyiv"
       ? "Europe/Kyiv"
-      : Intl.DateTimeFormat().resolvedOptions().timeZone
+      : localZone
 
   const timeFormatter = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
@@ -77,7 +79,15 @@ export default function RoomDetailsModal({
     timeZone: zone,
   })
 
+  const kyivTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Kyiv",
+  })
+
   const fmt = (v: string) => timeFormatter.format(parseUtc(v))
+  const fmtKyiv = (v: string) => kyivTimeFormatter.format(parseUtc(v))
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const list = reservations
@@ -94,21 +104,72 @@ export default function RoomDetailsModal({
 
   const visibleTimes = times.length > 1 ? times.slice(0, -1) : times
 
-  const floorSuffix =
-    room.floor === 1 ? "st" : room.floor === 2 ? "nd" : room.floor === 3 ? "rd" : "th"
+  const floorLabel = (n: number) => {
+    if (n === 1) return "1st floor"
+    if (n === 2) return "2nd floor"
+    if (n === 3) return "3rd floor"
+    return `${n}th floor`
+  }
+
+  const windowsValue =
+    room.windows != null ? String(room.windows).trim() : ""
+
+  const metaParts = [
+    floorLabel(room.floor),
+    `${room.capacity} seats`,
+    typeof room.area === "number" && room.area > 0 ? `${room.area} m²` : null,
+    windowsValue && windowsValue !== "0" ? `Windows: ${windowsValue}` : null,
+  ].filter(Boolean)
+
+  const selectedDateLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: zone,
+  }).format(toUtcFromDisplay(selectedDate, "12:00", zone))
+
+  const viewingLabel =
+    `${selectedDateLabel}, ${timeMode === "kyiv" ? "Kyiv time" : "Local time"}`
+
+  const todayInKyiv = toYmd(new Date(), "Europe/Kyiv")
+  const officeDate =
+    timeMode === "kyiv"
+      ? selectedDate
+      : toYmd(toUtcFromDisplay(selectedDate, "12:00", localZone), "Europe/Kyiv")
+
+  const isPastOfficeDate = officeDate < todayInKyiv
+
+  const formatSlotTime = (time: string) => {
+    if (timeMode === "kyiv") return time
+
+    const slotUtc = toUtcFromDisplay(selectedDate, time, zone)
+    const kyivText = kyivTimeFormatter.format(slotUtc)
+
+    return `${time} (${kyivText} Kyiv)`
+  }
 
   return (
     <div className="modal">
       <div className="modal-content room-modal">
-        <h2 style={{ marginBottom: "10px" }}>
-          {room.name}
-          {" · "}
-          {room.floor}
-          {floorSuffix}
-          {" floor · Capacity "}
-          {room.capacity}
-          {room.area != null && ` · ${room.area} m²`}
-        </h2>
+        <div
+          className="room-name"
+          style={{ marginBottom: "10px" }}
+        >
+          <div
+            className="room-title"
+            title={room.name}
+          >
+            {room.name}
+          </div>
+
+          <div
+            className="room-meta-line"
+            title={metaParts.join(" · ")}
+          >
+            {metaParts.join(" · ")}
+          </div>
+        </div>
 
         {!!room.features?.length && (
           <div
@@ -132,7 +193,7 @@ export default function RoomDetailsModal({
           className="small"
           style={{ marginBottom: "12px" }}
         >
-          Viewing in {timeMode === "kyiv" ? "Kyiv time" : "your local time"}
+          {viewingLabel}
         </div>
 
         {visibleTimes.map((time) => {
@@ -152,11 +213,13 @@ export default function RoomDetailsModal({
                 color: item ? "#ffc0c0" : "#97ffbd",
               }}
             >
-              <span>{time}</span>
+              <span>{formatSlotTime(time)}</span>
 
               <span>
                 {item
-                  ? `${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name ?? "Reserved"}`
+                  ? timeMode === "kyiv"
+                    ? `${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name ?? "Reserved"}`
+                    : `${fmt(item.start_at)}-${fmt(item.end_at)} (${fmtKyiv(item.start_at)}-${fmtKyiv(item.end_at)} Kyiv) ${item.user_name ?? "Reserved"}`
                   : "FREE"}
               </span>
             </div>
@@ -171,12 +234,14 @@ export default function RoomDetailsModal({
             Close
           </button>
 
-          <button
-            className="primary"
-            onClick={onCreate}
-          >
-            Create Reservation
-          </button>
+          {!isPastOfficeDate && (
+            <button
+              className="primary"
+              onClick={onCreate}
+            >
+              Create Reservation
+            </button>
+          )}
         </div>
       </div>
     </div>
