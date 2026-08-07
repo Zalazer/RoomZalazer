@@ -840,11 +840,7 @@ export function useAppData() {
         )
 
         setEnd(initialStart ? minutesToTime(mins(initialStart) + slot) : "")
-        setReserveError(
-          s
-            ? ""
-            : "No available time slots for this day. You can review the schedule, but booking is unavailable."
-        )
+        setReserveError("")
       }
     } else {
       setEditing(false)

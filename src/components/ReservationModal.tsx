@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import type { Room, Reservation } from "../hooks/useAppData"
 
 type Props = {
@@ -160,8 +161,6 @@ export default function ReservationModal({
   officeSettings,
   nowUtcMs,
 }: Props) {
-  if (!show) return null
-
   const localZone = getLocalTimeZone()
   const zone = timeMode === "kyiv" ? "Europe/Kyiv" : localZone
   const currentUtcMs =
@@ -303,27 +302,96 @@ export default function ReservationModal({
 
   const roomReservations = roomId ? getRoomReservations(roomId) : []
 
-  const availableStartTimes =
+  const nowInViewZone = new Date(currentUtcMs)
+  const todayInViewZone = toYmd(nowInViewZone, zone)
+
+  const nowHmInViewZone = (() => {
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: safeTimeZone(zone),
+      }).format(nowInViewZone)
+    } catch {
+      return ""
+    }
+  })()
+
+  const nowMinutesInViewZone = isHm(nowHmInViewZone) ? M(nowHmInViewZone) : null
+  const isTodayInViewZone =
+    isYmd(selectedDate) &&
+    !!todayInViewZone &&
+    selectedDate === todayInViewZone
+
+  const slotMinutes =
+    Number.isFinite(officeSettings?.slot_minutes) &&
+    officeSettings.slot_minutes > 0
+      ? officeSettings.slot_minutes
+      : 30
+
+  const roundUpToNextSlot = (minutes: number) => {
+    const remainder = minutes % slotMinutes
+    return remainder === 0 ? minutes : minutes + (slotMinutes - remainder)
+  }
+
+  const applyTodayFilter = (list: string[]) =>
+    isTodayInViewZone && nowMinutesInViewZone != null
+      ? list.filter((t) => M(t) >= roundUpToNextSlot(nowMinutesInViewZone))
+      : list
+
+  const rawAvailableStartTimes =
     isEndedDay
       ? []
       : !roomId || !times.length
         ? times.filter(isHm)
         : getAvailableStartTimes(roomReservations)
 
+  const availableStartTimes = applyTodayFilter(rawAvailableStartTimes)
+
   const safeStart =
     isHm(start) && availableStartTimes.includes(start)
       ? start
       : availableStartTimes[0] || ""
 
-  const availableEndTimes =
+  const rawAvailableEndTimes =
     isEndedDay || !roomId || !isHm(safeStart)
       ? []
       : getAvailableEndTimes(roomReservations, safeStart)
+
+  const availableEndTimes = rawAvailableEndTimes
 
   const safeEnd =
     isHm(end) && availableEndTimes.includes(end)
       ? end
       : availableEndTimes[0] || ""
+
+  useEffect(() => {
+    if (!show) return
+    if (loading) return
+    if (isEndedDay) return
+
+    if (start !== safeStart) {
+      setStart(safeStart)
+      return
+    }
+
+    if (end !== safeEnd) {
+      setEnd(safeEnd)
+    }
+  }, [
+    show,
+    loading,
+    isEndedDay,
+    start,
+    end,
+    safeStart,
+    safeEnd,
+    setStart,
+    setEnd,
+  ])
+
+  if (!show) return null
 
   const selectedDateProbe = toUtcFromDisplay(selectedDate, "12:00", zone)
   const selectedDateLabel = selectedDateProbe
@@ -359,6 +427,15 @@ export default function ReservationModal({
           : null,
       ].filter(Boolean)
     : ["Select a room to see room details"]
+
+  const noSlotsAvailable =
+  timeMode === "kyiv" &&
+  show &&
+  !!roomId &&
+  !loading &&
+  !isEndedDay &&
+  !safeStart &&
+  !safeEnd
 
   return (
     <div className="modal">
@@ -398,6 +475,15 @@ export default function ReservationModal({
           </div>
         )}
 
+        {noSlotsAvailable && (
+          <div
+            className="small ended"
+            style={{ marginBottom: "12px", fontWeight: 600, padding: "8px 10px", borderRadius: "12px" }}
+          >
+            No available time slots for this day. You can review the schedule, but booking is unavailable.
+          </div>
+        )}
+
         <label>Meeting title</label>
         <input
           placeholder="Enter meeting title..."
@@ -423,7 +509,8 @@ export default function ReservationModal({
             }
 
             const nextRoomReservations = getRoomReservations(nextRoomId)
-            const nextAvailableStarts = getAvailableStartTimes(nextRoomReservations)
+            const nextRawStarts = getAvailableStartTimes(nextRoomReservations)
+            const nextAvailableStarts = applyTodayFilter(nextRawStarts)
 
             if (nextAvailableStarts.length) {
               const nextStart = nextAvailableStarts[0]
@@ -537,6 +624,7 @@ export default function ReservationModal({
             disabled={
               loading ||
               isEndedDay ||
+              noSlotsAvailable ||
               !title.trim() ||
               !roomId ||
               !safeStart ||
