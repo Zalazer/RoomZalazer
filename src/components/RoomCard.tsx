@@ -44,7 +44,8 @@ const toUtcFromZone = (date: string, time: string, zone: string) => {
     hour12: false,
   }).formatToParts(probeUtc)
 
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || "0")
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value || "0")
 
   const seenY = get("year")
   const seenM = get("month")
@@ -157,37 +158,59 @@ export default function RoomCard({
   }
 
   const officeEnd = officeSettings?.working_day_end ?? ""
+  const officeStart = officeSettings?.working_day_start ?? ""
   const todayInKyiv = toYmd(new Date(nowUtcMs), "Europe/Kyiv")
 
   const officeEndUtcMs =
     officeEnd ? toUtcFromZone(officeDate, officeEnd, "Europe/Kyiv").getTime() : null
 
-  const isEndedDay =
-    officeDate < todayInKyiv ||
-    (officeDate === todayInKyiv &&
-      officeEndUtcMs != null &&
-      nowUtcMs >= officeEndUtcMs)
+  const isPastDay = officeDate < todayInKyiv
+  const isToday = officeDate === todayInKyiv
+
+  const futureBookableStarts = times
+    .filter((time) => {
+      if (!officeStart || !officeEnd) return true
+      return time >= officeStart && time < officeEnd
+    })
+    .map((time) => toUtcFromZone(officeDate, time, "Europe/Kyiv").getTime())
+    .filter((startMs) => startMs > nowUtcMs)
+
+  const hasFutureBookableSlot = futureBookableStarts.length > 0
 
   const nextUpcoming = roomReservations.find((r) => {
     const startMs = parseUtc(r.start_at).getTime()
     return startMs > nowUtcMs
   })
 
-  const statusText = isEndedDay
-    ? "This working day has ended."
-    : active
-      ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
-      : nextUpcoming
-        ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
-        : officeEnd
-          ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
-          : "Available"
+  const isBookingClosedForToday =
+    !active &&
+    isToday &&
+    !hasFutureBookableSlot
 
-  const statusClass = active
-    ? "reserved"
-    : isEndedDay
-      ? "ended"
-      : "available"
+  const isEndedDay =
+    isPastDay ||
+    (!!officeEndUtcMs && officeDate === todayInKyiv && nowUtcMs >= officeEndUtcMs)
+
+  const statusText = active
+    ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
+    : isBookingClosedForToday
+      ? officeEnd
+        ? `Free till ${formatOfficeEnd(officeDate, officeEnd)} · booking closed`
+        : "Booking closed"
+      : isPastDay
+        ? "This working day has ended."
+        : nextUpcoming
+          ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
+          : officeEnd
+            ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
+            : "Available"
+
+  const statusClass =
+    active
+      ? "reserved"
+      : isBookingClosedForToday || isEndedDay
+        ? "ended"
+        : "available"
 
   const windowsValue =
     room.windows != null ? String(room.windows).trim() : ""
