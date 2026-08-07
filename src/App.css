@@ -15,13 +15,11 @@ box-sizing:border-box
 --blue:#52a5ff;
 --purple:#b184ff;
 --muted:#b8beca;
-
-/* reservation ownership + shared accents */
 --own-reservation-bg:rgba(82,165,255,.10);
---own-reservation-border:rgba(82,165,255,.28);
+--own-reservation-border:rgba(82,165,255,.34);
 --own-reservation-text:#93c5fd;
 --own-reservation-meta:#bfdbfe;
-
+--own-reservation-strong:#dbeafe;
 --danger-soft-bg:rgba(255,87,87,.06);
 --danger-soft-border:rgba(255,87,87,.18);
 --neutral-soft-bg:rgba(255,255,255,.05);
@@ -33,13 +31,15 @@ font-family:system-ui,-apple-system,sans-serif;
 background:var(--bg);
 color:var(--txt);
 padding-bottom:90px;
-font-size:16px
+font-size:16px;
+overflow-x:hidden
 }
 
 .container{
 max-width:900px;
 margin:auto;
-padding:14px
+padding:14px;
+min-width:0
 }
 
 .card,
@@ -49,7 +49,9 @@ padding:14px
 background:var(--card);
 border-radius:18px;
 padding:16px;
-box-shadow:0 8px 24px rgba(0,0,0,.25)
+box-shadow:0 8px 24px rgba(0,0,0,.25);
+min-width:0;
+overflow:hidden
 }
 
 .card,
@@ -79,14 +81,16 @@ justify-content:space-between;
 align-items:center;
 gap:10px;
 margin-bottom:10px;
-font-size:17px
+font-size:17px;
+min-width:0
 }
 
 .info-actions{
 display:flex;
 align-items:center;
 gap:6px;
-flex-wrap:nowrap
+flex-wrap:nowrap;
+min-width:0
 }
 
 .info-actions--rooms{
@@ -142,12 +146,14 @@ display:flex;
 justify-content:space-between;
 align-items:center;
 gap:10px;
-margin-bottom:10px
+margin-bottom:10px;
+min-width:0
 }
 
 .room-name{
 flex:1;
-min-width:0
+min-width:0;
+overflow:hidden
 }
 
 .room-title{
@@ -157,7 +163,8 @@ line-height:1.2;
 margin-bottom:2px;
 white-space:nowrap;
 overflow:hidden;
-text-overflow:ellipsis
+text-overflow:ellipsis;
+min-width:0
 }
 
 .room-meta-line{
@@ -166,14 +173,17 @@ line-height:1.2;
 opacity:.78;
 white-space:nowrap;
 overflow:hidden;
-text-overflow:ellipsis
+text-overflow:ellipsis;
+min-width:0
 }
 
 .desc{
 line-height:1.45;
 margin-bottom:10px;
 opacity:.9;
-font-size:15px
+font-size:15px;
+overflow-wrap:anywhere;
+word-break:normal
 }
 
 .status{
@@ -209,7 +219,8 @@ margin-bottom:10px
 
 .t{
 height:14px;
-flex:1
+flex:1;
+min-width:0
 }
 
 .tf{
@@ -220,14 +231,20 @@ background:var(--green)
 background:var(--red)
 }
 
-.to{
-background:var(--blue)
+.to,
+.t--own,
+.timeline-slot--own,
+.timeline__slot--own{
+background:var(--blue);
+box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)
 }
 
 .small{
 opacity:.8;
 font-size:15px;
-line-height:1.5
+line-height:1.5;
+overflow-wrap:anywhere;
+word-break:normal
 }
 
 label{
@@ -248,7 +265,8 @@ border:none;
 border-radius:12px;
 background:var(--card2);
 color:#fff;
-margin-bottom:8px
+margin-bottom:8px;
+min-width:0
 }
 
 button{
@@ -348,7 +366,7 @@ background:rgba(0,0,0,.75);
 display:flex;
 justify-content:center;
 align-items:center;
-padding:20px;
+padding:14px;
 z-index:99
 }
 
@@ -379,12 +397,13 @@ margin-bottom:12px
 
 .modal-buttons{
 display:flex;
-gap:10px;
-margin-top:20px
+gap:8px;
+margin-top:12px
 }
 
 .modal-buttons button{
-flex:1
+flex:1;
+min-width:0
 }
 
 .footer{
@@ -407,7 +426,8 @@ font-weight:700
 display:flex;
 gap:6px;
 flex-wrap:nowrap;
-align-items:center
+align-items:center;
+min-width:0
 }
 
 .logout{
@@ -425,7 +445,8 @@ align-items:center;
 gap:6px;
 margin-top:0;
 flex-wrap:nowrap;
-flex:0 0 auto
+flex:0 0 auto;
+min-width:0
 }
 
 .reservation-tabs button{
@@ -447,21 +468,124 @@ box-shadow:0 0 0 1px rgba(82,165,255,.08) inset
 }
 
 .room-modal{
-padding:12px;
-max-width:430px
+padding:10px;
+max-width:420px;
+max-height:min(88vh,760px);
+overflow:auto;
+min-width:0
+}
+
+.room-modal__head{
+margin-bottom:6px;
+min-width:0
+}
+
+.room-modal__aux{
+margin-bottom:3px;
+font-size:12px;
+line-height:1.28
+}
+
+.room-modal__viewing{
+margin-bottom:6px;
+font-size:11px;
+line-height:1.2
+}
+
+.room-slot-head{
+display:grid;
+grid-template-columns:90px minmax(0,1fr);
+gap:6px;
+margin-bottom:4px;
+font-size:10px;
+line-height:1.1;
+color:var(--muted);
+opacity:.88;
+align-items:end;
+min-width:0
+}
+
+.room-slot-head__time,
+.room-slot-head__label{
+min-width:0
+}
+
+.room-slot-head__time{
+display:flex;
+flex-direction:column;
+align-items:flex-start;
+justify-content:flex-end;
+white-space:nowrap;
+overflow:hidden
+}
+
+.room-slot-head__time-main{
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+min-width:0
+}
+
+.room-slot-head__time-sub{
+margin-top:1px;
+font-size:9px;
+line-height:1;
+opacity:.9;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+min-width:0
+}
+
+.room-slot-head__label{
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
+}
+
+.room-slots{
+display:flex;
+flex-direction:column;
+gap:0;
+overflow-x:hidden;
+min-width:0
 }
 
 .room-slot{
-font-size:12px;
-margin-bottom:3px;
-line-height:1.05
+display:grid;
+grid-template-columns:90px minmax(0,1fr);
+align-items:center;
+gap:6px;
+font-size:11px;
+line-height:1.12;
+margin-bottom:0;
+padding:1px 0;
+min-width:0;
+overflow:hidden
 }
 
-.room-slot span:last-child{
-max-width:250px;
+.room-slot__time{
+opacity:.78;
+font-variant-numeric:tabular-nums;
+white-space:nowrap;
 overflow:hidden;
 text-overflow:ellipsis;
-white-space:nowrap
+min-width:0
+}
+
+.room-slot__label{
+display:block;
+min-width:0;
+max-width:100%;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+color:inherit
+}
+
+.room-slot__label--own{
+color:var(--own-reservation-strong);
+font-weight:700
 }
 
 .room-slot--free{
@@ -477,7 +601,9 @@ color:var(--own-reservation-text)
 }
 
 .reservation-list__hint{
-margin-bottom:10px
+margin-bottom:10px;
+overflow-wrap:anywhere;
+word-break:normal
 }
 
 .reservation{
@@ -486,7 +612,9 @@ border-radius:14px;
 padding:12px 14px;
 background:var(--neutral-soft-bg);
 border:1px solid var(--neutral-soft-border);
-transition:transform .15s ease,border-color .15s ease,background .15s ease
+transition:transform .15s ease,border-color .15s ease,background .15s ease;
+overflow:hidden;
+min-width:0
 }
 
 .reservation:hover{
@@ -508,10 +636,16 @@ border-color:var(--danger-soft-border)
 }
 
 .reservation__title{
+display:block;
+max-width:100%;
+min-width:0;
 margin-bottom:4px;
 color:var(--txt);
 font-weight:700;
-line-height:1.35
+line-height:1.35;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
 }
 
 .reservation__title--own{
@@ -519,12 +653,24 @@ color:var(--own-reservation-text)
 }
 
 .reservation__meta{
+display:block;
+max-width:100%;
+min-width:0;
 margin-bottom:6px;
-line-height:1.4
+line-height:1.4;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
 }
 
 .reservation__details{
-color:var(--muted)
+display:block;
+max-width:100%;
+min-width:0;
+color:var(--muted);
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
 }
 
 .reservation__details--own{
@@ -536,7 +682,8 @@ display:flex;
 justify-content:space-between;
 align-items:center;
 gap:10px;
-margin-top:10px
+margin-top:10px;
+min-width:0
 }
 
 .reservation__action-btn{
@@ -567,12 +714,6 @@ font-size:22px
 
 .day{
 min-width:64px
-}
-
-.room-slot{
-font-size:11px;
-margin-bottom:3px;
-line-height:1.05
 }
 
 .room-title{
@@ -631,6 +772,54 @@ flex:0 0 auto
 min-width:84px;
 font-size:12px;
 padding:6px 24px 6px 8px
+}
+
+.room-modal{
+padding:8px;
+max-width:100%;
+max-height:min(90vh,720px)
+}
+
+.room-modal__aux{
+margin-bottom:2px;
+font-size:11px;
+line-height:1.18
+}
+
+.room-modal__viewing{
+margin-bottom:5px;
+font-size:10px;
+line-height:1.15
+}
+
+.room-slot-head{
+grid-template-columns:78px minmax(0,1fr);
+gap:4px;
+margin-bottom:3px;
+font-size:9px
+}
+
+.room-slot-head__time-sub{
+font-size:8px;
+margin-top:1px
+}
+
+.room-slot{
+grid-template-columns:78px minmax(0,1fr);
+font-size:10px;
+line-height:1.08;
+gap:4px;
+padding:1px 0
+}
+
+.modal-buttons{
+gap:8px;
+margin-top:10px
+}
+
+.modal-buttons button{
+padding:10px 12px;
+font-size:15px
 }
 
 .reservation{

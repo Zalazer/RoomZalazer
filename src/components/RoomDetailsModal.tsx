@@ -42,7 +42,8 @@ function toUtcFromDisplay(date: string, time: string, zone: string) {
     hour12: false,
   }).formatToParts(probeUtc)
 
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || "0")
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value || "0")
 
   const seenY = get("year")
   const seenM = get("month")
@@ -55,6 +56,23 @@ function toUtcFromDisplay(date: string, time: string, zone: string) {
   const diff = desired - seen
 
   return new Date(probeUtc.getTime() + diff)
+}
+
+const normalizeId = (value: unknown) => {
+  if (value == null || value === "") return null
+  const normalized = Number(value)
+  return Number.isFinite(normalized) ? normalized : null
+}
+
+const normalizeText = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+
+const cutSingleLine = (value: unknown, max = 56) => {
+  const text = String(value ?? "").trim()
+  if (!text) return ""
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
 export default function RoomDetailsModal({
@@ -74,22 +92,9 @@ export default function RoomDetailsModal({
       ? "Europe/Kyiv"
       : localZone
 
-  const timeFormatter = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: zone,
-  })
+  const normalizedUserId = normalizeId(userId)
+  const currentUserName = normalizeText((reservations.find(Boolean) as any)?.current_user_name)
 
-  const kyivTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Kyiv",
-  })
-
-  const fmt = (v: string) => timeFormatter.format(parseUtc(v))
-  const fmtKyiv = (v: string) => kyivTimeFormatter.format(parseUtc(v))
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const list = reservations
@@ -146,18 +151,44 @@ export default function RoomDetailsModal({
     if (timeMode === "kyiv") return time
 
     const slotUtc = toUtcFromDisplay(selectedDate, time, zone)
-    const kyivText = kyivTimeFormatter.format(slotUtc)
+    const kyivText = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/Kyiv",
+    }).format(slotUtc)
 
-    return `${time} (${kyivText} Kyiv)`
+    return `${time} (${kyivText})`
+  }
+
+  const isOwnReservation = (reservation: Reservation | undefined) => {
+    if (!reservation) return false
+
+    const reservationAny = reservation as any
+    const ownerName = normalizeText(reservationAny.user_name)
+
+    const byId =
+      normalizedUserId != null &&
+      [
+        reservationAny.user_id,
+        reservationAny.created_by,
+        reservationAny.user?.id,
+      ]
+        .map(normalizeId)
+        .some((value) => value === normalizedUserId)
+
+    const byName =
+      !!currentUserName &&
+      !!ownerName &&
+      ownerName === currentUserName
+
+    return byId || byName
   }
 
   return (
     <div className="modal">
       <div className="modal-content room-modal">
-        <div
-          className="room-name"
-          style={{ marginBottom: "10px" }}
-        >
+        <div className="room-modal__head">
           <div
             className="room-title"
             title={room.name}
@@ -174,73 +205,89 @@ export default function RoomDetailsModal({
         </div>
 
         {!!room.features?.length && (
-          <div
-            className="small"
-            style={{ marginBottom: "6px" }}
-          >
+          <div className="room-modal__aux small">
             {room.features.join(" • ")}
           </div>
         )}
 
         {room.equipment && (
-          <div
-            className="small"
-            style={{ marginBottom: "6px" }}
-          >
+          <div className="room-modal__aux small">
             Equipment: {room.equipment}
           </div>
         )}
 
-        <div
-          className="small"
-          style={{ marginBottom: "12px" }}
-        >
+        <div className="room-modal__viewing small">
           {viewingLabel}
         </div>
 
-        {visibleTimes.map((time) => {
-          const slotUtcMs = toUtcFromDisplay(selectedDate, time, zone).getTime()
+        <div className="room-slot-head">
+          <span className="room-slot-head__time">
+            <span className="room-slot-head__time-main">
+              {timeMode === "kyiv" ? "Time" : "Local time"}
+            </span>
 
-          const item = list.find((r) => {
-            const startMs = parseUtc(r.start_at).getTime()
-            const endMs = parseUtc(r.end_at).getTime()
-            return slotUtcMs >= startMs && slotUtcMs < endMs
-          })
+            {timeMode === "local" && (
+              <span className="room-slot-head__time-sub">Kyiv time</span>
+            )}
+          </span>
 
-          const isOwn =
-            !!item &&
-            userId != null &&
-            (
-              Number((item as any).user_id) === Number(userId) ||
-              Number((item as any).created_by) === Number(userId) ||
-              Number((item as any).user?.id) === Number(userId)
+          <span className="room-slot-head__label">Owner — Title</span>
+        </div>
+
+        <div className="room-slots">
+          {visibleTimes.map((time) => {
+            const slotUtcMs = toUtcFromDisplay(selectedDate, time, zone).getTime()
+
+            const item = list.find((r) => {
+              const startMs = parseUtc(r.start_at).getTime()
+              const endMs = parseUtc(r.end_at).getTime()
+              return slotUtcMs >= startMs && slotUtcMs < endMs
+            })
+
+            const isOwn = isOwnReservation(item)
+
+            const slotClass = item
+              ? isOwn
+                ? "room-slot--own"
+                : "room-slot--other"
+              : "room-slot--free"
+
+            const meetingTitle = cutSingleLine(item?.title, 38)
+            const ownerName = cutSingleLine(item?.user_name, 20)
+
+            const label = item
+              ? [ownerName, meetingTitle].filter(Boolean).join(" — ") || "Reserved"
+              : "FREE"
+
+            return (
+              <div
+                key={time}
+                className={`room-slot ${slotClass}`}
+              >
+                <span
+                  className="room-slot__time"
+                  title={formatSlotTime(time)}
+                >
+                  {formatSlotTime(time)}
+                </span>
+
+                <span
+                  className={[
+                    "room-slot__label",
+                    isOwn ? "room-slot__label--own" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  title={item ? [String(item?.user_name || "").trim(), String(item?.title || "").trim()].filter(Boolean).join(" — ") : "FREE"}
+                >
+                  {label}
+                </span>
+              </div>
             )
+          })}
+        </div>
 
-          const slotClass = item
-            ? isOwn
-              ? "room-slot--own"
-              : "room-slot--other"
-            : "room-slot--free"
-
-          const label = item
-            ? timeMode === "kyiv"
-              ? `${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name ?? "Reserved"}`
-              : `${fmt(item.start_at)}-${fmt(item.end_at)} (${fmtKyiv(item.start_at)}-${fmtKyiv(item.end_at)} Kyiv) ${item.user_name ?? "Reserved"}`
-            : "FREE"
-
-          return (
-            <div
-              key={time}
-              className={`info room-slot ${slotClass}`}
-            >
-              <span>{formatSlotTime(time)}</span>
-
-              <span>{label}</span>
-            </div>
-          )
-        })}
-
-        <div className="modal-buttons">
+        <div className="modal-buttons room-modal__buttons">
           <button
             className="secondary"
             onClick={onClose}

@@ -192,6 +192,16 @@ export default function App() {
   }
 
   const handleEditReservation = (id: number) => {
+    const reservation =
+      a.currentReservations.find((r) => r.id === id) ??
+      a.pastReservations.find((r) => r.id === id) ??
+      a.reservations.find((r) => r.id === id)
+
+    if (reservation?.start_at) {
+      const nextDate = parseReservationDate(reservation.start_at, a.timeMode)
+      a.setSelectedDate(nextDate)
+    }
+
     setEditingReservationId(id)
     a.editReservation(id)
   }

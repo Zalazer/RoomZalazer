@@ -22,6 +22,12 @@ const safeUtc = (v?: string | null) => {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+const cutSingleLine = (value: unknown, max = 72) => {
+  const text = String(value ?? "").trim()
+  if (!text) return ""
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
 export default function ReservationList({
   title,
   reservations,
@@ -109,7 +115,6 @@ export default function ReservationList({
     }
 
     const bySeats = Number(ar?.capacity ?? 0) - Number(br?.capacity ?? 0)
-
     if (bySeats !== 0) return bySeats
 
     const byName = String(ar?.name || "").localeCompare(
@@ -190,6 +195,14 @@ export default function ReservationList({
               : "reserved"
 
           const mins = duration(r.start_at, r.end_at)
+          const safeTitle = cutSingleLine(r.title || "Untitled reservation", 84)
+          const timeLine = [
+            safeFormatDateTime(r.start_at),
+            endTime(r.end_at),
+            mins !== null ? `${mins} min` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
 
           return (
             <div
@@ -213,21 +226,16 @@ export default function ReservationList({
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                title={r.title || "Untitled reservation"}
               >
-                {safeFormatDateTime(r.start_at)}
-                {" - "}
-                {endTime(r.end_at)}
-                {mins !== null && (
-                  <>
-                    {" · "}
-                    {mins}
-                    {" min"}
-                  </>
-                )}
+                {safeTitle}
               </div>
 
-              <div className="reservation__meta">
-                {r.title || "Untitled reservation"}
+              <div
+                className="reservation__meta"
+                title={timeLine}
+              >
+                {timeLine}
               </div>
 
               <div
@@ -238,6 +246,7 @@ export default function ReservationList({
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                title={roomMetaLine(r, status)}
               >
                 {roomMetaLine(r, status)}
               </div>

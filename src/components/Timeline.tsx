@@ -24,8 +24,7 @@ function toYmd(date: Date, zone: string) {
 
 const parseUtc = (v: string) => {
   const raw = String(v)
-  const d = new Date(raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`)
-  return d
+  return new Date(raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`)
 }
 
 function toUtcFromZone(date: string, time: string, zone: string) {
@@ -60,6 +59,12 @@ function toUtcFromZone(date: string, time: string, zone: string) {
   return new Date(probeUtc.getTime() + diff)
 }
 
+const normalizeId = (value: unknown) => {
+  if (value == null || value === "") return null
+  const normalized = Number(value)
+  return Number.isFinite(normalized) ? normalized : null
+}
+
 export default function Timeline({
   roomId,
   reservations,
@@ -73,6 +78,8 @@ export default function Timeline({
       ? "Europe/Kyiv"
       : Intl.DateTimeFormat().resolvedOptions().timeZone
 
+  const normalizedUserId = normalizeId(userId)
+
   const dateOf = (v: string) => toYmd(parseUtc(v), zone)
 
   const roomReservations = reservations.filter(
@@ -84,24 +91,29 @@ export default function Timeline({
 
   const visibleTimes = times.length > 1 ? times.slice(0, -1) : times
 
+  const isOwnReservation = (reservation: Reservation) => {
+    if (normalizedUserId == null) return false
+
+    const reservationAny = reservation as any
+
+    return [
+      reservationAny.user_id,
+      reservationAny.created_by,
+      reservationAny.user?.id,
+    ]
+      .map(normalizeId)
+      .some((value) => value === normalizedUserId)
+  }
+
   const slotClass = (slot: string) => {
-    const slotUtc = toUtcFromZone(selectedDate, slot, zone)
-    const slotUtcMs = slotUtc.getTime()
+    const slotUtcMs = toUtcFromZone(selectedDate, slot, zone).getTime()
 
     for (const reservation of roomReservations) {
       const startMs = parseUtc(reservation.start_at).getTime()
       const endMs = parseUtc(reservation.end_at).getTime()
 
       if (slotUtcMs >= startMs && slotUtcMs < endMs) {
-        const isOwn =
-          userId != null &&
-          (
-            Number((reservation as any).user_id) === Number(userId) ||
-            Number((reservation as any).created_by) === Number(userId) ||
-            Number((reservation as any).user?.id) === Number(userId)
-          )
-
-        return isOwn ? "to" : "tr"
+        return isOwnReservation(reservation) ? "to t--own" : "tr"
       }
     }
 
