@@ -38,7 +38,7 @@ export type Reservation = {
   end_at: string
   status?: string
   user_name?: string
-  room: {
+  room?: {
     id: number
     name: string
     description: string
@@ -48,8 +48,8 @@ export type Reservation = {
     windows?: string | null
     equipment?: string | null
     photo_url?: string | null
-    features: string[]
-    photos: {
+    features?: string[]
+    photos?: {
       photo_url: string
       sort_order: number
     }[]
@@ -87,40 +87,43 @@ export type OfficeCalendarDay = {
 type AppStatus = "booting" | "guest" | "ready" | "error"
 
 const pad = (n: number) => String(n).padStart(2, "0")
-
 const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
 const isHm = (v: string) => /^\d{2}:\d{2}$/.test(v)
-
 const mins = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
+const minutesToTime = (v: number) => `${pad(Math.floor(v / 60))}:${pad(v % 60)}`
 
-const minutesToTime = (v: number) =>
-  `${pad(Math.floor(v / 60))}:${pad(v % 60)}`
-
-
-function isWithinWorkingBounds(
-  startMinutes: number,
-  endMinutes: number,
-  boundsStart: number,
-  boundsEnd: number
-) {
-  if (boundsEnd > boundsStart) {
-    return startMinutes >= boundsStart && endMinutes <= boundsEnd
+const safeStorageGet = (key: string, fallback = "") => {
+  try {
+    return window.localStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
   }
-
-  const normalize = (value: number) =>
-    value < boundsStart ? value + 1440 : value
-
-  const s = normalize(startMinutes)
-  const e = normalize(endMinutes)
-  const endBound = boundsEnd + 1440
-
-  return s >= boundsStart && e <= endBound && e > s
 }
 
+const safeStorageSet = (key: string, value: string) => {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {}
+}
+
+const safeStorageRemove = (key: string) => {
+  try {
+    window.localStorage.removeItem(key)
+  } catch {}
+}
+
+const getSafeTimeZone = () => {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (tz && typeof tz === "string" && tz.trim()) return tz
+  } catch {}
+  return "UTC"
+}
 
 function parseUtcDateTime(value: string) {
-  const normalized = String(value || "").replace(" ", "T")
-  return new Date(`${normalized}Z`)
+  const normalized = String(value || "").trim().replace(" ", "T")
+  const date = new Date(normalized.endsWith("Z") ? normalized : `${normalized}Z`)
+  return Number.isNaN(date.getTime()) ? new Date(0) : date
 }
 
 function ymdFromDate(date: Date, timeZone?: string) {
@@ -132,7 +135,6 @@ function ymdFromDate(date: Date, timeZone?: string) {
   }).formatToParts(date)
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
-
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
@@ -145,7 +147,6 @@ function hmFromDate(date: Date, timeZone?: string) {
   }).formatToParts(date)
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "00"
-
   return `${get("hour")}:${get("minute")}`
 }
 
@@ -181,44 +182,37 @@ function getTodayYmd(
   return mode === "kyiv" ? kyivYmd(nowUTC) : localYmd(nowUTC)
 }
 
-export const formatKyivDate = (utc: Date) => kyivYmd(utc)
+function isWithinWorkingBounds(
+  startMinutes: number,
+  endMinutes: number,
+  boundsStart: number,
+  boundsEnd: number
+) {
+  if (boundsEnd > boundsStart) {
+    return startMinutes >= boundsStart && endMinutes <= boundsEnd
+  }
 
-export const formatKyivTime = (utc: Date) =>
-  new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Kyiv",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(utc)
+  const normalize = (value: number) => (value < boundsStart ? value + 1440 : value)
+  const s = normalize(startMinutes)
+  const e = normalize(endMinutes)
+  const endBound = boundsEnd + 1440
+
+  return s >= boundsStart && e <= endBound && e > s
+}
 
 export const fromUTC = (value: string, mode: "kyiv" | "local") =>
   new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone:
-      mode === "kyiv"
-        ? "Europe/Kyiv"
-        : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: mode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
   }).format(parseUtcDateTime(value))
 
-export const toUTC = (
-  date: string,
-  time: string,
-  mode: "kyiv" | "local"
-) => {
+export const toUTC = (date: string, time: string, mode: "kyiv" | "local") => {
   const [y, m, d] = date.split("-").map(Number)
   const [h, min] = time.split(":").map(Number)
 
-  const displayTimeZone =
-    mode === "kyiv"
-      ? "Europe/Kyiv"
-      : Intl.DateTimeFormat().resolvedOptions().timeZone
-
+  const displayTimeZone = mode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone()
   const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
 
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -249,24 +243,18 @@ export const toUTC = (
     .slice(0, 19)
 }
 
-
 function getDisplayYmd(value: string, mode: "kyiv" | "local") {
   const d = parseUtcDateTime(value)
   return mode === "kyiv" ? kyivYmd(d) : localYmd(d)
 }
 
-
-function getOfficeDateForSelectedDate(
-  selectedDate: string,
-  mode: "kyiv" | "local"
-) {
+function getOfficeDateForSelectedDate(selectedDate: string, mode: "kyiv" | "local") {
   if (!isYmd(selectedDate)) return selectedDate
   if (mode === "kyiv") return selectedDate
 
   const localMiddayUtc = toUTC(selectedDate, "12:00", "local")
   return kyivYmd(parseUtcDateTime(localMiddayUtc))
 }
-
 
 function getCalendarDay(calendar: OfficeCalendarDay[], selectedDate: string) {
   return calendar.find((v) => v.date === selectedDate) || null
@@ -277,22 +265,12 @@ function getEffectiveWorkingHours(
   officeSettings: OfficeSettings | null,
   officeCalendar: OfficeCalendarDay[]
 ) {
-  if (!officeSettings) {
-    return {
-      closed: false,
-      start: "",
-      end: "",
-    }
-  }
+  if (!officeSettings) return { closed: false, start: "", end: "" }
 
   const day = getCalendarDay(officeCalendar, selectedDate)
 
   if (day && Number(day.is_working_day) === 0) {
-    return {
-      closed: true,
-      start: "",
-      end: "",
-    }
+    return { closed: true, start: "", end: "" }
   }
 
   return {
@@ -302,7 +280,29 @@ function getEffectiveWorkingHours(
   }
 }
 
+const unwrapRooms = (payload: any): Room[] => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.rooms)) return payload.rooms
+  if (payload?.ok && Array.isArray(payload?.data)) return payload.data
+  return []
+}
 
+const unwrapReservations = (payload: any): Reservation[] => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.reservations)) return payload.reservations
+  if (payload?.ok && Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const unwrapMyReservations = (payload: any): Reservation[] => {
+  if (Array.isArray(payload)) return payload
+  const upcoming = Array.isArray(payload?.upcoming) ? payload.upcoming : []
+  const past = Array.isArray(payload?.past) ? payload.past : []
+  if (upcoming.length || past.length) return [...upcoming, ...past]
+  if (payload?.ok && Array.isArray(payload?.reservations)) return payload.reservations
+  if (payload?.ok && Array.isArray(payload?.data)) return payload.data
+  return []
+}
 
 export const getTimes = (
   mode: "kyiv" | "local",
@@ -312,24 +312,17 @@ export const getTimes = (
   if (!settings) return []
 
   const slot = Number(settings.slot_minutes)
-  if (!slot || !isHm(settings.working_day_start) || !isHm(settings.working_day_end)) {
-    return []
-  }
+  if (!slot || !isHm(settings.working_day_start) || !isHm(settings.working_day_end)) return []
 
   const list: string[] = []
 
-  for (
-    let m = mins(settings.working_day_start);
-    m <= mins(settings.working_day_end);
-    m += slot
-  ) {
+  for (let m = mins(settings.working_day_start); m <= mins(settings.working_day_end); m += slot) {
     list.push(minutesToTime(m))
   }
 
   if (mode === "kyiv") return list
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-
+  const tz = getSafeTimeZone()
   const anchorDate = selectedDate || kyivYmd(getCurrentUtc("", 0))
 
   return list.map((t) => {
@@ -343,24 +336,19 @@ export const getTimes = (
   })
 }
 
-
-
 export const getOfficeBounds = (
   mode: "kyiv" | "local",
   settings: OfficeSettings | null,
   selectedDate?: string
 ) => {
-  if (!settings) {
-    return { start: 0, end: 0 }
-  }
+  if (!settings) return { start: 0, end: 0 }
 
   const startKyiv = mins(settings.working_day_start)
   const endKyiv = mins(settings.working_day_end)
 
   if (mode === "kyiv") return { start: startKyiv, end: endKyiv }
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-
+  const tz = getSafeTimeZone()
   const anchorDate = selectedDate || kyivYmd(getCurrentUtc("", 0))
 
   const startUTC = toUTC(anchorDate, settings.working_day_start, "kyiv")
@@ -383,17 +371,14 @@ export const getOfficeBounds = (
   return { start: mins(s), end: mins(e) }
 }
 
-
-
-
 const nextSlot = (
   reservations: Reservation[],
   calendar: OfficeCalendarDay[],
   settings: OfficeSettings | null,
   date: string,
   mode: "kyiv" | "local",
-  serverNow: string,
-  serverReceivedAt: number
+  serverNowValue: string,
+  serverReceivedAtValue: number
 ) => {
   if (!settings || !isYmd(date)) return ""
 
@@ -403,11 +388,7 @@ const nextSlot = (
   if (dayMeta.closed) return ""
   if (!isHm(dayMeta.start) || !isHm(dayMeta.end)) return ""
 
-  const tz =
-    mode === "kyiv"
-      ? "Europe/Kyiv"
-      : Intl.DateTimeFormat().resolvedOptions().timeZone
-
+  const tz = mode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone()
   const dayStartUTC = toUTC(officeDate, dayMeta.start, "kyiv")
   const dayEndUTC = toUTC(officeDate, dayMeta.end, "kyiv")
 
@@ -435,8 +416,7 @@ const nextSlot = (
           }).format(parseUtcDateTime(dayEndUTC))
         )
 
-  const nowUTC = getCurrentUtc(serverNow, serverReceivedAt)
-
+  const nowUTC = getCurrentUtc(serverNowValue, serverReceivedAtValue)
   const today = mode === "kyiv" ? kyivYmd(nowUTC) : localYmd(nowUTC)
 
   let slot = dayStart
@@ -455,7 +435,6 @@ const nextSlot = (
           )
 
     const slotSize = Number(settings.slot_minutes || settings.min_booking_minutes)
-
     if (!slotSize) return ""
 
     slot = Math.max(dayStart, Math.ceil(current / slotSize) * slotSize)
@@ -463,10 +442,7 @@ const nextSlot = (
 
   const busy = reservations
     .filter((r) => {
-      const rOfficeDate = getOfficeDateForSelectedDate(
-        getDisplayYmd(r.start_at, mode),
-        mode
-      )
+      const rOfficeDate = getOfficeDateForSelectedDate(getDisplayYmd(r.start_at, mode), mode)
       return rOfficeDate === officeDate && r.status !== "cancelled"
     })
     .map((r) => ({
@@ -498,10 +474,8 @@ const nextSlot = (
   return ""
 }
 
-
-
 export function useAppData() {
-  const [token, setToken] = useState(localStorage.getItem("token") || "")
+  const [token, setToken] = useState(() => safeStorageGet("token", ""))
   const [status, setStatus] = useState<AppStatus>("booting")
   const [appError, setAppError] = useState("")
 
@@ -521,9 +495,8 @@ export function useAppData() {
   const [serverReceivedAt, setServerReceivedAt] = useState(0)
 
   const [selectedDate, setSelectedDate] = useState("")
-
-  const [timeMode, setTimeMode] = useState<"kyiv" | "local">(
-    localStorage.getItem("timeMode") === "local" ? "local" : "kyiv"
+  const [timeMode, setTimeMode] = useState<"kyiv" | "local">(() =>
+    safeStorageGet("timeMode", "kyiv") === "local" ? "local" : "kyiv"
   )
 
   const todayDate = useMemo(
@@ -565,23 +538,17 @@ export function useAppData() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
 
-
   function resetAuthForm(opts?: { keepEmail?: boolean }) {
     const keepEmail = !!opts?.keepEmail
-
-    if (!keepEmail) {
-      setEmail("")
-    }
-
+    if (!keepEmail) setEmail("")
     setPassword("")
     setName("")
     setLoginError("")
     setRegisterError("")
   }
 
-
   useEffect(() => {
-    localStorage.setItem("timeMode", timeMode)
+    safeStorageSet("timeMode", timeMode)
   }, [timeMode])
 
   useEffect(() => {
@@ -602,6 +569,7 @@ export function useAppData() {
       }).format(now)
 
       const localText = new Intl.DateTimeFormat("en-GB", {
+        timeZone: getSafeTimeZone(),
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -621,18 +589,13 @@ export function useAppData() {
   }, [serverNow, serverReceivedAt])
 
   useEffect(() => {
-  if (!serverNow || selectedDate) return
-  setSelectedDate(getTodayYmd(timeMode, serverNow, serverReceivedAt))
-}, [timeMode, serverNow, serverReceivedAt, selectedDate])
-
-  useEffect(() => {
     void initApp()
   }, [])
 
   useEffect(() => {
-    if (status !== "ready" || !token || !selectedDate || !isYmd(selectedDate)) return
+    if (status !== "ready" || !selectedDate || !isYmd(selectedDate)) return
     void loadCalendarForDate(selectedDate)
-  }, [selectedDate, token, status])
+  }, [selectedDate, status, token])
 
   async function api(path: string, options: RequestInit = {}) {
     const headers: Record<string, string> = {
@@ -641,18 +604,18 @@ export function useAppData() {
 
     if (token) headers.Authorization = `Bearer ${token}`
 
-    const r = await fetch(`${API}${path}`, { ...options, headers })
+    const response = await fetch(`${API}${path}`, { ...options, headers })
 
     let data: any = null
 
     try {
-      data = await r.json()
+      data = await response.json()
     } catch {
       data = { ok: false, error: "Invalid server response" }
     }
 
-    if (!r.ok && data?.ok === undefined) {
-      return { ok: false, error: `HTTP ${r.status}` }
+    if (!response.ok && data?.ok === undefined) {
+      return { ok: false, error: `HTTP ${response.status}` }
     }
 
     return data
@@ -660,22 +623,35 @@ export function useAppData() {
 
   async function loadServerTime() {
     try {
-      const r = await fetch(`${API}/time`)
-      const data = await r.json()
+      const response = await fetch(`${API}/time`)
+      const data = await response.json()
 
       if (data?.ok && data?.utc) {
-        setServerNow(String(data.utc).replace("Z", "").slice(0, 19))
-        setServerReceivedAt(Date.now())
+        const nextServerNow = String(data.utc).replace("Z", "").slice(0, 19)
+        const nextReceivedAt = Date.now()
+
+        setServerNow(nextServerNow)
+        setServerReceivedAt(nextReceivedAt)
+
+        return { serverNow: nextServerNow, serverReceivedAt: nextReceivedAt }
       }
-    } catch {
-      const now = new Date()
-      setServerNow(now.toISOString().replace("Z", "").slice(0, 19))
-      setServerReceivedAt(Date.now())
+    } catch {}
+
+    const now = new Date()
+    const fallbackServerNow = now.toISOString().replace("Z", "").slice(0, 19)
+    const fallbackReceivedAt = Date.now()
+
+    setServerNow(fallbackServerNow)
+    setServerReceivedAt(fallbackReceivedAt)
+
+    return {
+      serverNow: fallbackServerNow,
+      serverReceivedAt: fallbackReceivedAt,
     }
   }
 
   async function loadPublicBootstrap() {
-    await loadServerTime()
+    const timeInfo = await loadServerTime()
 
     const settings = await fetch(`${API}/office/settings`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -685,10 +661,10 @@ export function useAppData() {
 
     if (settings?.ok && settings?.settings) {
       setOfficeSettings(settings.settings)
-      return true
+      return { ok: true as const, timeInfo }
     }
 
-    return false
+    return { ok: false as const, timeInfo }
   }
 
   async function loadCalendarForDate(date: string) {
@@ -704,7 +680,7 @@ export function useAppData() {
     const me = await api("/auth/me")
 
     if (!me?.ok || !me.user) {
-      localStorage.removeItem("token")
+      safeStorageRemove("token")
       setToken("")
       setUser(null)
       setRooms([])
@@ -722,60 +698,52 @@ export function useAppData() {
       api("/my/reservations"),
     ])
 
-    setRooms(Array.isArray(roomsRes) ? roomsRes : [])
-    setReservations(Array.isArray(reservationsRes) ? reservationsRes : [])
-
-    if (mineRes?.ok) {
-      setMyReservations([...(mineRes.upcoming || []), ...(mineRes.past || [])])
-    } else {
-      setMyReservations([])
-    }
+    setRooms(unwrapRooms(roomsRes))
+    setReservations(unwrapReservations(reservationsRes))
+    setMyReservations(unwrapMyReservations(mineRes))
 
     return true
   }
 
-
-
-
-    async function initApp() {
+  async function initApp() {
     setStatus("booting")
     setAppError("")
     setLoginError("")
     setRegisterError("")
 
     try {
-      const publicOk = await loadPublicBootstrap()
+      const publicBootstrap = await loadPublicBootstrap()
 
-      if (!publicOk) {
+      if (!publicBootstrap.ok) {
         setAppError("Unable to load office settings.")
         setStatus("error")
         return
       }
 
+      const currentServerNow = publicBootstrap.timeInfo.serverNow
+      const currentServerReceivedAt = publicBootstrap.timeInfo.serverReceivedAt
+
       if (!token) {
         resetAuthForm()
         setRegisterMode(false)
+        setSelectedDate(getTodayYmd(timeMode, currentServerNow, currentServerReceivedAt))
         setStatus("guest")
         return
       }
 
       const privateOk = await loadPrivateBootstrap()
-
       if (!privateOk) return
 
-      const initialDate = getTodayYmd(timeMode, serverNow, serverReceivedAt)
+      const initialDate = getTodayYmd(timeMode, currentServerNow, currentServerReceivedAt)
 
       setSelectedDate(initialDate)
       await loadCalendarForDate(initialDate)
-
       setStatus("ready")
     } catch (e: any) {
       setAppError(e?.message || "Failed to initialize app.")
       setStatus(token ? "error" : "guest")
     }
   }
-
-
 
   const workingHoursText = useMemo(() => {
     if (!officeSettings || !selectedDate || !isYmd(selectedDate)) return ""
@@ -788,8 +756,7 @@ export function useAppData() {
 
     if (timeMode === "kyiv") return `${dayMeta.start} - ${dayMeta.end}`
 
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-
+    const tz = getSafeTimeZone()
     const sUTC = toUTC(officeDate, dayMeta.start, "kyiv")
     const eUTC = toUTC(officeDate, dayMeta.end, "kyiv")
 
@@ -838,7 +805,7 @@ export function useAppData() {
         return
       }
 
-        const s = nextSlot(
+      const s = nextSlot(
         reservations,
         officeCalendar,
         officeSettings,
@@ -852,22 +819,20 @@ export function useAppData() {
         const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
         const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
 
-const fallbackStart =
-  timeMode === "kyiv"
-    ? dayMeta.start
-    : getTimes(
-        timeMode,
-        {
-          ...officeSettings,
-          working_day_start: dayMeta.start,
-          working_day_end: dayMeta.end,
-        },
-        selectedDate
-      )[0] || ""
-
+        const fallbackStart =
+          timeMode === "kyiv"
+            ? dayMeta.start
+            : getTimes(
+                timeMode,
+                {
+                  ...officeSettings,
+                  working_day_start: dayMeta.start,
+                  working_day_end: dayMeta.end,
+                },
+                selectedDate
+              )[0] || ""
 
         const initialStart = s || fallbackStart
-
         setStart(initialStart)
 
         const slot = Number(
@@ -881,8 +846,6 @@ const fallbackStart =
             : "No available time slots for this day. You can review the schedule, but booking is unavailable."
         )
       }
-
-
     } else {
       setEditing(false)
       setEditingId(null)
@@ -892,10 +855,7 @@ const fallbackStart =
     _setShowModal(v)
   }
 
-
-
-
-    async function login() {
+  async function login() {
     setLoginError("")
     setRegisterError("")
 
@@ -910,10 +870,9 @@ const fallbackStart =
       return
     }
 
-    localStorage.setItem("token", r.token)
+    safeStorageSet("token", r.token)
     setToken(r.token)
 
-    const oldToken = token
     const nextToken = r.token
 
     try {
@@ -924,8 +883,8 @@ const fallbackStart =
       }).then((res) => res.json())
 
       if (!me?.ok || !me.user) {
-        localStorage.removeItem("token")
-        setToken(oldToken)
+        safeStorageRemove("token")
+        setToken("")
         setLoginError("Unable to load user session")
         setStatus("guest")
         return
@@ -933,7 +892,7 @@ const fallbackStart =
 
       setUser(me.user)
 
-      const [roomsRes, reservationsRes, settingsRes, mineRes] = await Promise.all([
+      const [roomsRes, reservationsRes, settingsRes, mineRes, timeInfo] = await Promise.all([
         fetch(`${API}/rooms`, { headers: { Authorization: `Bearer ${nextToken}` } }).then((r) =>
           r.json()
         ),
@@ -946,19 +905,19 @@ const fallbackStart =
         fetch(`${API}/my/reservations`, {
           headers: { Authorization: `Bearer ${nextToken}` },
         }).then((r) => r.json()),
+        loadServerTime(),
       ])
 
-      setRooms(Array.isArray(roomsRes) ? roomsRes : [])
-      setReservations(Array.isArray(reservationsRes) ? reservationsRes : [])
+      setRooms(unwrapRooms(roomsRes))
+      setReservations(unwrapReservations(reservationsRes))
 
       if (settingsRes?.ok && settingsRes?.settings) {
         setOfficeSettings(settingsRes.settings)
       }
 
-      setMyReservations([...(mineRes?.upcoming || []), ...(mineRes?.past || [])])
+      setMyReservations(unwrapMyReservations(mineRes))
 
-      const activeDate = getTodayYmd(timeMode, serverNow, serverReceivedAt)
-
+      const activeDate = getTodayYmd(timeMode, timeInfo.serverNow, timeInfo.serverReceivedAt)
       setSelectedDate(activeDate)
 
       const month = activeDate.slice(0, 7)
@@ -979,9 +938,7 @@ const fallbackStart =
     }
   }
 
-
-
-    async function register() {
+  async function register() {
     setRegisterError("")
     setLoginError("")
 
@@ -1013,14 +970,12 @@ const fallbackStart =
     resetAuthForm({ keepEmail: true })
   }
 
-
-
-    async function logout() {
+  async function logout() {
     try {
       await api("/auth/logout", { method: "POST" })
     } catch {}
 
-    localStorage.removeItem("token")
+    safeStorageRemove("token")
     setToken("")
     resetAuthForm()
     setRegisterMode(false)
@@ -1037,7 +992,6 @@ const fallbackStart =
     _setShowModal(false)
     setStatus("guest")
   }
-
 
   function openProfile() {
     if (!user) return
@@ -1072,9 +1026,7 @@ const fallbackStart =
 
     const r = await api("/auth/profile", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: profileName.trim(),
         email: profileEmail.trim(),
@@ -1099,7 +1051,6 @@ const fallbackStart =
 
     setEditing(true)
     setEditingId(id)
-
     setTitle(r.title)
     setRoomId(String(r.room_id))
     setStart(fromUTC(r.start_at, timeMode))
@@ -1204,17 +1155,17 @@ const fallbackStart =
     }
 
     const effectiveBounds =
-  timeMode === "kyiv"
-    ? { start: mins(dayMeta.start), end: mins(dayMeta.end) }
-    : getOfficeBounds(
-        timeMode,
-        {
-          ...officeSettings,
-          working_day_start: dayMeta.start,
-          working_day_end: dayMeta.end,
-        },
-        selectedDate
-      )
+      timeMode === "kyiv"
+        ? { start: mins(dayMeta.start), end: mins(dayMeta.end) }
+        : getOfficeBounds(
+            timeMode,
+            {
+              ...officeSettings,
+              working_day_start: dayMeta.start,
+              working_day_end: dayMeta.end,
+            },
+            selectedDate
+          )
 
     if (!isWithinWorkingBounds(s, e, effectiveBounds.start, effectiveBounds.end)) {
       setReserveError(`Working hours are ${workingHoursText}.`)
@@ -1269,10 +1220,7 @@ const fallbackStart =
     if (!isYmd(v)) return v
     const d = utcDateFromYmd(v)
     return new Intl.DateTimeFormat("en-GB", {
-      timeZone:
-        timeMode === "kyiv"
-          ? "Europe/Kyiv"
-          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: timeMode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -1284,10 +1232,7 @@ const fallbackStart =
     if (!isYmd(v)) return v
     const d = utcDateFromYmd(v)
     return new Intl.DateTimeFormat("en-GB", {
-      timeZone:
-        timeMode === "kyiv"
-          ? "Europe/Kyiv"
-          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: timeMode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
       weekday: "short",
     }).format(d)
   }
@@ -1296,20 +1241,14 @@ const fallbackStart =
     if (!isYmd(v)) return v
     const d = utcDateFromYmd(v)
     return new Intl.DateTimeFormat("en-GB", {
-      timeZone:
-        timeMode === "kyiv"
-          ? "Europe/Kyiv"
-          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: timeMode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
       day: "2-digit",
     }).format(d)
   }
 
   const formatDateTime = (v: string) =>
     new Intl.DateTimeFormat("en-GB", {
-      timeZone:
-        timeMode === "kyiv"
-          ? "Europe/Kyiv"
-          : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: timeMode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
       weekday: "short",
       day: "2-digit",
       month: "2-digit",
@@ -1409,8 +1348,8 @@ const fallbackStart =
     timeMode,
     setTimeMode,
 
-TIMES: getTimes(timeMode, officeSettings, selectedDate),
-getTimes: (mode: "kyiv" | "local") => getTimes(mode, officeSettings, selectedDate),
+    TIMES: getTimes(timeMode, officeSettings, selectedDate),
+    getTimes: (mode: "kyiv" | "local") => getTimes(mode, officeSettings, selectedDate),
 
     officeSettings,
     officeCalendar,

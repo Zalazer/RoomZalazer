@@ -1,4 +1,5 @@
 import "./App.css"
+import { useState } from "react"
 import HeaderCard from "./components/HeaderCard"
 import CalendarHeader from "./components/CalendarHeader"
 import WeekSelector from "./components/WeekSelector"
@@ -9,22 +10,164 @@ import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
 import { useAppData } from "./hooks/useAppData"
 
+const getSafeTimeZone = () => {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (tz && typeof tz === "string" && tz.trim()) return tz
+  } catch {}
+  return "UTC"
+}
+
+const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
+const isHm = (v: string) => /^\d{2}:\d{2}$/.test(v)
+
 const parseReservationDate = (value: string, mode: "kyiv" | "local") => {
-  const utc = new Date(`${String(value).replace(" ", "T")}Z`)
+  const raw = String(value || "")
+  const utc = new Date(raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`)
 
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone:
-      mode === "kyiv"
-        ? "Europe/Kyiv"
-        : Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: mode === "kyiv" ? "Europe/Kyiv" : getSafeTimeZone(),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(utc)
 }
 
+const formatYmdInZone = (date: Date, zone: string) => {
+  try {
+    const text = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date)
+
+    if (isYmd(text)) return text
+
+    const parts = text.split(/[./-]/).map((v) => v.trim())
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1]}-${parts[2]}`
+    }
+
+    return text
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date)
+  }
+}
+
+const getUtcMsFromWallClock = (date: string, time: string) => {
+  const [y, m, d] = date.split("-").map(Number)
+  const [h, min] = time.split(":").map(Number)
+  return Date.UTC(y, m - 1, d, h, min, 0, 0)
+}
+
+const toUtcFromZoneSafe = (date: string, time: string, zone: string) => {
+  if (!isYmd(date) || !isHm(time)) return new Date(NaN)
+
+  try {
+    const utcGuess = new Date(getUtcMsFromWallClock(date, time))
+
+    const rendered = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(utcGuess)
+
+    const match = rendered.match(
+      /(d{4})-(d{2})-(d{2})s+(d{2}):(d{2})/
+    )
+
+    if (!match) return utcGuess
+
+    const seenY = Number(match[1])
+    const seenM = Number(match[2])
+    const seenD = Number(match[3])
+    const seenH = Number(match[4])
+    const seenMin = Number(match[5])
+
+    const desired = Date.UTC(
+      Number(date.slice(0, 4)),
+      Number(date.slice(5, 7)) - 1,
+      Number(date.slice(8, 10)),
+      Number(time.slice(0, 2)),
+      Number(time.slice(3, 5))
+    )
+
+    const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+    const diff = desired - seen
+
+    return new Date(utcGuess.getTime() + diff)
+  } catch {
+    return new Date(getUtcMsFromWallClock(date, time))
+  }
+}
+
+const getOfficeDateForSelectedDate = (
+  selectedDate: string,
+  timeMode: "kyiv" | "local"
+) => {
+  if (!isYmd(selectedDate)) return selectedDate
+  if (timeMode === "kyiv") return selectedDate
+
+  const localZone = getSafeTimeZone()
+  const localMiddayUtc = toUtcFromZoneSafe(selectedDate, "12:00", localZone)
+
+  if (Number.isNaN(localMiddayUtc.getTime())) return selectedDate
+
+  return formatYmdInZone(localMiddayUtc, "Europe/Kyiv")
+}
+
 export default function App() {
   const a = useAppData()
+  const [editingReservationId, setEditingReservationId] = useState<number | null>(null)
+
+  const safeNowUtcMs =
+    typeof a.nowUtcMs === "number" && Number.isFinite(a.nowUtcMs)
+      ? a.nowUtcMs
+      : Date.now()
+
+  const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
+  const todayInKyiv = formatYmdInZone(new Date(safeNowUtcMs), "Europe/Kyiv")
+  const officeEnd = a.officeSettings?.working_day_end ?? ""
+
+  const officeEndUtcMs =
+    officeEnd && isYmd(officeDate) && isHm(officeEnd)
+      ? toUtcFromZoneSafe(officeDate, officeEnd, "Europe/Kyiv").getTime()
+      : null
+
+  const isCreateDisabledForSelectedDay =
+    isYmd(officeDate) &&
+    (officeDate < todayInKyiv ||
+      (officeDate === todayInKyiv &&
+        officeEndUtcMs != null &&
+        Number.isFinite(officeEndUtcMs) &&
+        safeNowUtcMs >= officeEndUtcMs))
+
+  const handleOpenCreate = () => {
+    if (isCreateDisabledForSelectedDay) return
+    setEditingReservationId(null)
+    a.setShowModal(true)
+  }
+
+  const handleEditReservation = (id: number) => {
+    setEditingReservationId(id)
+    a.editReservation(id)
+  }
+
+  const handleCloseModal = () => {
+    a.setShowModal(false)
+    setEditingReservationId(null)
+  }
+
+  const selectedRoom = a.selectedRoom
 
   if (a.status === "booting") {
     return (
@@ -45,7 +188,10 @@ export default function App() {
           <h1>RoomZalazer</h1>
           <div className="subtitle">Smart Meeting Room Reservation Platform</div>
 
-          <div className="error" style={{ marginBottom: "12px" }}>
+          <div
+            className="error"
+            style={{ marginBottom: "12px" }}
+          >
             {a.appError || "Application failed to load."}
           </div>
 
@@ -149,19 +295,17 @@ export default function App() {
           }}
         />
 
-
         {a.showCurrent && (
           <ReservationList
             title="Current Reservations"
             reservations={a.currentReservations}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
-            nowUtcMs={a.nowUtcMs}
+            nowUtcMs={safeNowUtcMs}
             onDelete={a.deleteReservation}
-            onEdit={a.editReservation}
+            onEdit={handleEditReservation}
             onOpenPast={(r) => {
               const nextDate = parseReservationDate(r.start_at, a.timeMode)
-
               a.setSelectedDate(nextDate)
 
               const room = a.rooms.find((v) => v.id === r.room_id)
@@ -170,19 +314,17 @@ export default function App() {
           />
         )}
 
-
         {a.showPast && (
           <ReservationList
             title="Past Reservations"
             reservations={a.pastReservations}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
-            nowUtcMs={a.nowUtcMs}
+            nowUtcMs={safeNowUtcMs}
             onDelete={a.deleteReservation}
-            onEdit={a.editReservation}
+            onEdit={handleEditReservation}
             onOpenPast={(r) => {
               const nextDate = parseReservationDate(r.start_at, a.timeMode)
-
               a.setSelectedDate(nextDate)
 
               const room = a.rooms.find((v) => v.id === r.room_id)
@@ -205,7 +347,6 @@ export default function App() {
           formatDayNumber={a.formatDayNumber}
         />
 
-
         {a.rooms.map((room) => (
           <RoomCard
             key={room.id}
@@ -215,7 +356,7 @@ export default function App() {
             timeMode={a.timeMode}
             times={a.TIMES}
             officeSettings={a.officeSettings}
-            nowUtcMs={a.nowUtcMs}
+            nowUtcMs={safeNowUtcMs}
             onClick={() => a.setSelectedRoom(room)}
           />
         ))}
@@ -224,8 +365,14 @@ export default function App() {
       </div>
 
       <button
-        className="float"
-        onClick={() => a.setShowModal(true)}
+        className={`float ${isCreateDisabledForSelectedDay ? "float-disabled" : ""}`}
+        onClick={handleOpenCreate}
+        disabled={isCreateDisabledForSelectedDay}
+        title={
+          isCreateDisabledForSelectedDay
+            ? "This working day has ended."
+            : "Create reservation"
+        }
       >
         +
       </button>
@@ -246,10 +393,13 @@ export default function App() {
         end={a.end}
         setEnd={a.setEnd}
         onReserve={a.reserveRoom}
-        onClose={() => a.setShowModal(false)}
+        onClose={handleCloseModal}
         editing={a.editing}
+        editingReservationId={editingReservationId}
         error={a.reserveError}
         loading={a.isReserving}
+        officeSettings={a.officeSettings}
+        nowUtcMs={safeNowUtcMs}
       />
 
       <ProfileModal
@@ -266,16 +416,18 @@ export default function App() {
         onClose={() => a.setShowProfileModal(false)}
       />
 
-      {a.selectedRoom && (
+      {selectedRoom && (
         <RoomDetailsModal
-          room={a.selectedRoom}
+          room={selectedRoom}
           reservations={a.reservations}
           selectedDate={a.selectedDate}
           timeMode={a.timeMode}
           times={a.TIMES}
           onClose={() => a.setSelectedRoom(null)}
           onCreate={() => {
-            a.setRoomId(String(a.selectedRoom!.id))
+            if (isCreateDisabledForSelectedDay) return
+            setEditingReservationId(null)
+            a.setRoomId(String(selectedRoom.id))
             a.setSelectedRoom(null)
             a.setShowModal(true)
           }}

@@ -18,47 +18,122 @@ type Props = {
   onReserve: () => void
   onClose: () => void
   editing?: boolean
+  editingReservationId?: number | null
   error?: string
   loading?: boolean
+  officeSettings?: any
+  nowUtcMs?: number
 }
 
 const M = (v: string) =>
   Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
 
 const isHm = (v: string) => /^\d{2}:\d{2}$/.test(v)
+const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
 
-const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+const isValidDate = (date: Date) => Number.isFinite(date.getTime())
+
+const safeTimeZone = (value?: string) => {
+  if (!value || typeof value !== "string") return "UTC"
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value })
+    return value
+  } catch {
+    return "UTC"
+  }
+}
+
+const getLocalTimeZone = () => {
+  try {
+    return safeTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  } catch {
+    return "UTC"
+  }
+}
+
+const parseUtc = (v: string) => {
+  const raw = String(v || "")
+  const normalized = raw.endsWith("Z")
+    ? raw
+    : `${raw.replace(" ", "T")}Z`
+
+  const date = new Date(normalized)
+  return isValidDate(date) ? date : null
+}
+
+const toYmd = (date: Date, zone: string) => {
+  if (!isValidDate(date)) return ""
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: safeTimeZone(zone),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date)
+
+    const get = (type: string) =>
+      parts.find((p) => p.type === type)?.value || ""
+
+    const y = get("year")
+    const m = get("month")
+    const d = get("day")
+
+    return y && m && d ? `${y}-${m}-${d}` : ""
+  } catch {
+    return ""
+  }
+}
 
 const toUtcFromDisplay = (date: string, time: string, zone: string) => {
+  if (!isYmd(date) || !isHm(time)) return null
+
   const [y, m, d] = date.split("-").map(Number)
   const [h, min] = time.split(":").map(Number)
 
-  const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
+  if (
+    !Number.isFinite(y) ||
+    !Number.isFinite(m) ||
+    !Number.isFinite(d) ||
+    !Number.isFinite(h) ||
+    !Number.isFinite(min)
+  ) {
+    return null
+  }
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: zone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(probeUtc)
+  try {
+    const probeUtc = new Date(Date.UTC(y, m - 1, d, h, min))
+    if (!isValidDate(probeUtc)) return null
 
-  const get = (type: string) =>
-    Number(parts.find((p) => p.type === type)?.value || "0")
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: safeTimeZone(zone),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(probeUtc)
 
-  const seenY = get("year")
-  const seenM = get("month")
-  const seenD = get("day")
-  const seenH = get("hour")
-  const seenMin = get("minute")
+    const get = (type: string) =>
+      Number(parts.find((p) => p.type === type)?.value || "0")
 
-  const desired = Date.UTC(y, m - 1, d, h, min)
-  const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
-  const diff = desired - seen
+    const seenY = get("year")
+    const seenM = get("month")
+    const seenD = get("day")
+    const seenH = get("hour")
+    const seenMin = get("minute")
 
-  return new Date(probeUtc.getTime() + diff)
+    const desired = Date.UTC(y, m - 1, d, h, min)
+    const seen = Date.UTC(seenY, seenM - 1, seenD, seenH, seenMin)
+    const diff = desired - seen
+
+    const result = new Date(probeUtc.getTime() + diff)
+    return isValidDate(result) ? result : null
+  } catch {
+    return null
+  }
 }
 
 export default function ReservationModal({
@@ -79,15 +154,20 @@ export default function ReservationModal({
   onReserve,
   onClose,
   editing = false,
+  editingReservationId = null,
   error = "",
   loading = false,
+  officeSettings,
+  nowUtcMs,
 }: Props) {
   if (!show) return null
 
-  const zone =
-    timeMode === "kyiv"
-      ? "Europe/Kyiv"
-      : Intl.DateTimeFormat().resolvedOptions().timeZone
+  const localZone = getLocalTimeZone()
+  const zone = timeMode === "kyiv" ? "Europe/Kyiv" : localZone
+  const currentUtcMs =
+    typeof nowUtcMs === "number" && Number.isFinite(nowUtcMs)
+      ? nowUtcMs
+      : Date.now()
 
   const floorLabel = (n: number) => {
     if (n === 1) return "1st floor"
@@ -96,46 +176,81 @@ export default function ReservationModal({
     return `${n}th floor`
   }
 
-  const fmt = (v: string) =>
-    new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: zone,
-    }).format(parseUtc(v))
+  const fmt = (v: string) => {
+    const date = parseUtc(v)
+    if (!date) return ""
 
-  const dateOf = (v: string) =>
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: zone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(parseUtc(v))
-      .reduce((acc, part) => {
-        if (part.type !== "literal") acc[part.type] = part.value
-        return acc
-      }, {} as Record<string, string>)
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: safeTimeZone(zone),
+      }).format(date)
+    } catch {
+      return ""
+    }
+  }
+
+  const dateOfInZone = (v: string, targetZone: string) => {
+    const date = parseUtc(v)
+    if (!date) return ""
+    return toYmd(date, targetZone)
+  }
 
   const selectedRoom = rooms.find((r) => String(r.id) === roomId)
+
+  const officeDate =
+    timeMode === "kyiv"
+      ? (isYmd(selectedDate) ? selectedDate : "")
+      : (() => {
+          const localMiddayUtc = toUtcFromDisplay(selectedDate, "12:00", localZone)
+          return localMiddayUtc ? toYmd(localMiddayUtc, "Europe/Kyiv") : ""
+        })()
+
+  const todayInKyiv = toYmd(new Date(currentUtcMs), "Europe/Kyiv")
+  const officeEnd = isHm(officeSettings?.working_day_end ?? "")
+    ? officeSettings.working_day_end
+    : ""
+
+  const officeEndUtcMs =
+    officeDate && officeEnd
+      ? toUtcFromDisplay(officeDate, officeEnd, "Europe/Kyiv")?.getTime() ?? null
+      : null
+
+  const isEndedDay =
+    !!officeDate &&
+    !!todayInKyiv &&
+    (
+      officeDate < todayInKyiv ||
+      (officeDate === todayInKyiv &&
+        officeEndUtcMs != null &&
+        currentUtcMs >= officeEndUtcMs)
+    )
 
   const getRoomReservations = (targetRoomId: string) =>
     reservations
       .filter((r) => {
-        const d = dateOf(r.start_at)
-        const ymd = `${d.year}-${d.month}-${d.day}`
+        const reservationOfficeDate = dateOfInZone(r.start_at, "Europe/Kyiv")
+        const isSameReservation =
+          editing &&
+          editingReservationId != null &&
+          Number(r.id) === Number(editingReservationId)
 
         return (
           r.room_id === Number(targetRoomId) &&
           r.status !== "cancelled" &&
-          ymd === selectedDate
+          !!reservationOfficeDate &&
+          !!officeDate &&
+          reservationOfficeDate === officeDate &&
+          !isSameReservation
         )
       })
-      .sort(
-        (a, b) =>
-          parseUtc(a.start_at).getTime() -
-          parseUtc(b.start_at).getTime()
-      )
+      .sort((a, b) => {
+        const ta = parseUtc(a.start_at)?.getTime() ?? 0
+        const tb = parseUtc(b.start_at)?.getTime() ?? 0
+        return ta - tb
+      })
 
   const getNextBusyStart = (
     roomReservations: Reservation[],
@@ -143,7 +258,7 @@ export default function ReservationModal({
   ) =>
     roomReservations
       .map((r) => M(fmt(r.start_at)))
-      .filter((v) => v > M(startValue))
+      .filter((v) => Number.isFinite(v) && v > M(startValue))
       .sort((a, b) => a - b)[0]
 
   const getAvailableEndTimes = (
@@ -171,8 +286,13 @@ export default function ReservationModal({
       const m = M(t)
 
       const occupied = roomReservations.some((r) => {
-        const s = M(fmt(r.start_at))
-        const e = M(fmt(r.end_at))
+        const startFmt = fmt(r.start_at)
+        const endFmt = fmt(r.end_at)
+
+        if (!isHm(startFmt) || !isHm(endFmt)) return false
+
+        const s = M(startFmt)
+        const e = M(endFmt)
         return m >= s && m < e
       })
 
@@ -184,9 +304,11 @@ export default function ReservationModal({
   const roomReservations = roomId ? getRoomReservations(roomId) : []
 
   const availableStartTimes =
-    !roomId || !times.length
-      ? times.filter(isHm)
-      : getAvailableStartTimes(roomReservations)
+    isEndedDay
+      ? []
+      : !roomId || !times.length
+        ? times.filter(isHm)
+        : getAvailableStartTimes(roomReservations)
 
   const safeStart =
     isHm(start) && availableStartTimes.includes(start)
@@ -194,7 +316,7 @@ export default function ReservationModal({
       : availableStartTimes[0] || ""
 
   const availableEndTimes =
-    !roomId || !isHm(safeStart)
+    isEndedDay || !roomId || !isHm(safeStart)
       ? []
       : getAvailableEndTimes(roomReservations, safeStart)
 
@@ -203,16 +325,24 @@ export default function ReservationModal({
       ? end
       : availableEndTimes[0] || ""
 
-  const selectedDateLabel = new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: zone,
-  }).format(toUtcFromDisplay(selectedDate, "12:00", zone))
+  const selectedDateProbe = toUtcFromDisplay(selectedDate, "12:00", zone)
+  const selectedDateLabel = selectedDateProbe
+    ? (() => {
+        try {
+          return new Intl.DateTimeFormat("en-GB", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            timeZone: safeTimeZone(zone),
+          }).format(selectedDateProbe)
+        } catch {
+          return selectedDate
+        }
+      })()
+    : selectedDate
 
-  const viewingLabel =
-    `${selectedDateLabel}, ${timeMode === "kyiv" ? "Kyiv time" : "Local time"}`
+  const viewingLabel = `${selectedDateLabel}, ${timeMode === "kyiv" ? "Kyiv time" : "Local time"}`
 
   const windowsValue =
     selectedRoom?.windows != null ? String(selectedRoom.windows).trim() : ""
@@ -259,24 +389,32 @@ export default function ReservationModal({
           {viewingLabel}
         </div>
 
-        <label>Meeting title</label>
+        {isEndedDay && (
+          <div
+            className="small ended"
+            style={{ marginBottom: "12px", fontWeight: 600, padding: "8px 10px", borderRadius: "12px" }}
+          >
+            This working day has ended.
+          </div>
+        )}
 
+        <label>Meeting title</label>
         <input
           placeholder="Enter meeting title..."
           value={title}
+          disabled={loading || isEndedDay}
           onChange={(e) => setTitle(e.target.value)}
         />
 
         {!!error && <div className="error">{error}</div>}
 
         <label>Room</label>
-
         <select
           value={roomId}
+          disabled={loading || isEndedDay}
           onChange={(e) => {
-            setRoomId(e.target.value)
-
             const nextRoomId = e.target.value
+            setRoomId(nextRoomId)
 
             if (!nextRoomId) {
               setStart("")
@@ -341,9 +479,9 @@ export default function ReservationModal({
         )}
 
         <label>Start time</label>
-
         <select
           value={safeStart}
+          disabled={loading || isEndedDay || !availableStartTimes.length}
           onChange={(e) => {
             const nextStartValue = e.target.value
             setStart(nextStartValue)
@@ -365,14 +503,16 @@ export default function ReservationModal({
               </option>
             ))
           ) : (
-            <option value="">No start slots</option>
+            <option value="">
+              {isEndedDay ? "This working day has ended" : "No start slots"}
+            </option>
           )}
         </select>
 
         <label>End time</label>
-
         <select
           value={safeEnd}
+          disabled={loading || isEndedDay || !availableEndTimes.length}
           onChange={(e) => setEnd(e.target.value)}
         >
           {availableEndTimes.length ? (
@@ -385,7 +525,9 @@ export default function ReservationModal({
               </option>
             ))
           ) : (
-            <option value="">No end slots</option>
+            <option value="">
+              {isEndedDay ? "This working day has ended" : "No end slots"}
+            </option>
           )}
         </select>
 
@@ -394,6 +536,7 @@ export default function ReservationModal({
             className="primary"
             disabled={
               loading ||
+              isEndedDay ||
               !title.trim() ||
               !roomId ||
               !safeStart ||
