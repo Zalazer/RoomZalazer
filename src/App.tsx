@@ -1,5 +1,5 @@
 import "./App.css"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import HeaderCard from "./components/HeaderCard"
 import CalendarHeader from "./components/CalendarHeader"
 import WeekSelector from "./components/WeekSelector"
@@ -9,6 +9,8 @@ import ReservationList from "./components/ReservationList"
 import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
 import { useAppData } from "./hooks/useAppData"
+
+type RoomSortField = "name" | "floor" | "seats"
 
 const getSafeTimeZone = () => {
   try {
@@ -82,8 +84,8 @@ const toUtcFromZoneSafe = (date: string, time: string, zone: string) => {
     }).format(utcGuess)
 
     const match = rendered.match(
-      /(d{4})-(d{2})-(d{2})s+(d{2}):(d{2})/
-    )
+  /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
+)
 
     if (!match) return utcGuess
 
@@ -128,11 +130,17 @@ const getOfficeDateForSelectedDate = (
 export default function App() {
   const a = useAppData()
   const [editingReservationId, setEditingReservationId] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<RoomSortField>("seats")
 
   const safeNowUtcMs =
     typeof a.nowUtcMs === "number" && Number.isFinite(a.nowUtcMs)
       ? a.nowUtcMs
       : Date.now()
+
+  const normalizedUserId =
+    a.user?.id != null && Number.isFinite(Number(a.user.id))
+      ? Number(a.user.id)
+      : null
 
   const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
   const todayInKyiv = formatYmdInZone(new Date(safeNowUtcMs), "Europe/Kyiv")
@@ -150,6 +158,32 @@ export default function App() {
         officeEndUtcMs != null &&
         Number.isFinite(officeEndUtcMs) &&
         safeNowUtcMs >= officeEndUtcMs))
+
+  const sortedRooms = useMemo(() => {
+    const rooms = [...a.rooms]
+
+    rooms.sort((left, right) => {
+      if (sortBy === "name") {
+        return String(left.name || "").localeCompare(String(right.name || ""))
+      }
+
+      if (sortBy === "floor") {
+        const byFloor = Number(left.floor || 0) - Number(right.floor || 0)
+        if (byFloor !== 0) return byFloor
+        return String(left.name || "").localeCompare(String(right.name || ""))
+      }
+
+      const leftSeats = Number(left.capacity ?? 0)
+      const rightSeats = Number(right.capacity ?? 0)
+      const bySeats = leftSeats - rightSeats
+
+      if (bySeats !== 0) return bySeats
+
+      return String(left.name || "").localeCompare(String(right.name || ""))
+    })
+
+    return rooms
+  }, [a.rooms, sortBy])
 
   const handleOpenCreate = () => {
     if (isCreateDisabledForSelectedDay) return
@@ -283,6 +317,8 @@ export default function App() {
           rooms={a.rooms.length}
           current={a.currentReservations.length}
           past={a.pastReservations.length}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
           onLogout={a.logout}
           onEdit={a.openProfile}
           onCurrent={() => {
@@ -299,6 +335,8 @@ export default function App() {
           <ReservationList
             title="Current Reservations"
             reservations={a.currentReservations}
+            rooms={sortedRooms}
+            sortBy={sortBy}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
             nowUtcMs={safeNowUtcMs}
@@ -318,6 +356,8 @@ export default function App() {
           <ReservationList
             title="Past Reservations"
             reservations={a.pastReservations}
+            rooms={sortedRooms}
+            sortBy={sortBy}
             timeMode={a.timeMode}
             formatDateTime={a.formatDateTime}
             nowUtcMs={safeNowUtcMs}
@@ -347,7 +387,7 @@ export default function App() {
           formatDayNumber={a.formatDayNumber}
         />
 
-        {a.rooms.map((room) => (
+        {sortedRooms.map((room) => (
           <RoomCard
             key={room.id}
             room={room}
@@ -358,6 +398,7 @@ export default function App() {
             officeSettings={a.officeSettings}
             nowUtcMs={safeNowUtcMs}
             onClick={() => a.setSelectedRoom(room)}
+            userId={normalizedUserId}
           />
         ))}
 
@@ -379,7 +420,7 @@ export default function App() {
 
       <ReservationModal
         show={a.showModal}
-        rooms={a.rooms}
+        rooms={sortedRooms}
         times={a.TIMES}
         reservations={a.reservations}
         selectedDate={a.selectedDate}
@@ -423,6 +464,7 @@ export default function App() {
           selectedDate={a.selectedDate}
           timeMode={a.timeMode}
           times={a.TIMES}
+          userId={normalizedUserId}
           onClose={() => a.setSelectedRoom(null)}
           onCreate={() => {
             if (isCreateDisabledForSelectedDay) return

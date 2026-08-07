@@ -1,8 +1,12 @@
-import type { Reservation } from "../hooks/useAppData"
+import type { Reservation, Room } from "../hooks/useAppData"
+
+type RoomSortField = "name" | "floor" | "seats"
 
 type Props = {
   title: string
   reservations: Reservation[]
+  rooms: Room[]
+  sortBy: RoomSortField
   timeMode: "kyiv" | "local"
   formatDateTime: (v: string) => string
   nowUtcMs: number
@@ -13,13 +17,16 @@ type Props = {
 
 const safeUtc = (v?: string | null) => {
   if (!v) return null
-  const d = new Date(`${String(v).replace(" ", "T")}Z`)
+  const raw = String(v)
+  const d = new Date(raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`)
   return Number.isNaN(d.getTime()) ? null : d
 }
 
 export default function ReservationList({
   title,
   reservations,
+  rooms,
+  sortBy,
   timeMode,
   formatDateTime,
   nowUtcMs,
@@ -27,12 +34,14 @@ export default function ReservationList({
   onEdit,
   onOpenPast,
 }: Props) {
+  const roomById = new Map(rooms.map((room) => [room.id, room]))
+
   const floorText = (n?: number) => {
     if (n == null) return ""
-    if (n === 1) return "1st"
-    if (n === 2) return "2nd"
-    if (n === 3) return "3rd"
-    return `${n}th`
+    if (n === 1) return "1st floor"
+    if (n === 2) return "2nd floor"
+    if (n === 3) return "3rd floor"
+    return `${n}th floor`
   }
 
   const safeFormatDateTime = (v?: string | null) => {
@@ -59,7 +68,89 @@ export default function ReservationList({
     return Number.isFinite(minutes) && minutes >= 0 ? minutes : null
   }
 
+  const getReservationRoom = (r: Reservation) => r.room ?? roomById.get(r.room_id)
+
+  const compareRoom = (a: Reservation, b: Reservation) => {
+    const ar = getReservationRoom(a)
+    const br = getReservationRoom(b)
+
+    if (sortBy === "name") {
+      const byName = String(ar?.name || "").localeCompare(
+        String(br?.name || ""),
+        undefined,
+        {
+          numeric: true,
+          sensitivity: "base",
+        }
+      )
+      if (byName !== 0) return byName
+
+      const byFloor = Number(ar?.floor ?? 0) - Number(br?.floor ?? 0)
+      if (byFloor !== 0) return byFloor
+
+      return Number(ar?.capacity ?? 0) - Number(br?.capacity ?? 0)
+    }
+
+    if (sortBy === "floor") {
+      const byFloor = Number(ar?.floor ?? 0) - Number(br?.floor ?? 0)
+      if (byFloor !== 0) return byFloor
+
+      const byName = String(ar?.name || "").localeCompare(
+        String(br?.name || ""),
+        undefined,
+        {
+          numeric: true,
+          sensitivity: "base",
+        }
+      )
+      if (byName !== 0) return byName
+
+      return Number(ar?.capacity ?? 0) - Number(br?.capacity ?? 0)
+    }
+
+    const bySeats = Number(ar?.capacity ?? 0) - Number(br?.capacity ?? 0)
+
+    if (bySeats !== 0) return bySeats
+
+    const byName = String(ar?.name || "").localeCompare(
+      String(br?.name || ""),
+      undefined,
+      {
+        numeric: true,
+        sensitivity: "base",
+      }
+    )
+    if (byName !== 0) return byName
+
+    return Number(ar?.floor ?? 0) - Number(br?.floor ?? 0)
+  }
+
+  const roomMetaLine = (r: Reservation, status: string) => {
+    const room = getReservationRoom(r)
+    const parts: string[] = []
+
+    if (room?.name) parts.push(room.name)
+    if (room?.floor != null) parts.push(floorText(room.floor))
+    if (room?.capacity != null) parts.push(`${room.capacity} seats`)
+    if (typeof room?.area === "number" && room.area > 0) {
+      parts.push(`${room.area} m²`)
+    }
+
+    const windowsValue = room?.windows != null ? String(room.windows).trim() : ""
+
+    if (windowsValue && windowsValue !== "0") {
+      parts.push(`Windows: ${windowsValue}`)
+    }
+
+    parts.push(status)
+
+    return parts.join(" · ")
+  }
+
   const list = [...reservations].sort((a, b) => {
+    const byRoom = compareRoom(a, b)
+    if (byRoom !== 0) return byRoom
+
     const ac = a.status === "cancelled"
     const bc = b.status === "cancelled"
 
@@ -75,17 +166,10 @@ export default function ReservationList({
     <div className="card">
       <h2>
         {title}
-        {title.toLowerCase().includes("past") && (
-          <span className="small">
-            &nbsp;(Tap to view room)
-          </span>
-        )}
+        <span className="small">&nbsp;(Tap to view)</span>
       </h2>
 
-      <div
-        className="small"
-        style={{ marginBottom: "10px" }}
-      >
+      <div className="small reservation-list__hint">
         Viewing in {timeMode === "kyiv" ? "Kyiv time" : "your local time"}
       </div>
 
@@ -96,35 +180,40 @@ export default function ReservationList({
           const endDate = safeUtc(r.end_at)
           const isCancelled = r.status === "cancelled"
           const isFinished = !isCancelled && !!endDate && endDate.getTime() < nowUtcMs
+          const isOwn = !isCancelled && !isFinished
+          const clickable = !!onOpenPast
 
           const status = isCancelled
             ? "cancelled"
             : isFinished
-            ? "finished"
-            : "reserved"
+              ? "finished"
+              : "reserved"
 
-          const clickable = status !== "reserved"
           const mins = duration(r.start_at, r.end_at)
 
           return (
             <div
               key={r.id}
-              className="reservation"
-              style={{
-                marginBottom: "8px",
-                cursor: clickable ? "pointer" : "default",
-                background:
-                  status === "finished"
-                    ? "rgba(255,255,255,.05)"
-                    : status === "cancelled"
-                    ? "rgba(255,80,80,.06)"
-                    : undefined,
-              }}
+              className={[
+                "reservation",
+                clickable ? "reservation--clickable" : "",
+                isOwn ? "reservation--own" : "",
+                isCancelled ? "reservation--cancelled" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => {
                 if (clickable) onOpenPast?.(r)
               }}
             >
-              <div className="title">
+              <div
+                className={[
+                  "reservation__title",
+                  isOwn ? "reservation__title--own" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 {safeFormatDateTime(r.start_at)}
                 {" - "}
                 {endTime(r.end_at)}
@@ -137,29 +226,26 @@ export default function ReservationList({
                 )}
               </div>
 
-              <div>{r.title || "Untitled reservation"}</div>
-
-              <div className="small">
-                {r.room?.name || "Unknown room"}
-                {r.room?.floor != null && (
-                  <>
-                    {" · "}
-                    {floorText(r.room.floor)}
-                    {" floor"}
-                  </>
-                )}
-                {" · Capacity "}
-                {r.room?.capacity ?? "-"}
-                {r.room?.area != null && ` · ${r.room.area} m²`}
-                {r.room?.windows && ` · ${r.room.windows}`}
-                {" · "}
-                {status}
+              <div className="reservation__meta">
+                {r.title || "Untitled reservation"}
               </div>
 
-              {status === "reserved" && (
-                <div className="actions">
+              <div
+                className={[
+                  "reservation__details",
+                  "small",
+                  isOwn ? "reservation__details--own" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {roomMetaLine(r, status)}
+              </div>
+
+              {isOwn && (
+                <div className="reservation__actions">
                   <button
-                    className="secondary"
+                    className="secondary reservation__action-btn"
                     onClick={(e) => {
                       e.stopPropagation()
                       onEdit(r.id)
@@ -169,7 +255,7 @@ export default function ReservationList({
                   </button>
 
                   <button
-                    className="secondary"
+                    className="secondary reservation__action-btn reservation__action-btn--cancel"
                     onClick={(e) => {
                       e.stopPropagation()
                       onDelete(r.id)

@@ -8,6 +8,7 @@ type Props = {
   times: string[]
   onClose: () => void
   onCreate: () => void
+  userId?: number | null
 }
 
 function toYmd(date: Date, zone: string) {
@@ -64,6 +65,7 @@ export default function RoomDetailsModal({
   times,
   onClose,
   onCreate,
+  userId = null,
 }: Props) {
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -205,23 +207,35 @@ export default function RoomDetailsModal({
             return slotUtcMs >= startMs && slotUtcMs < endMs
           })
 
+          const isOwn =
+            !!item &&
+            userId != null &&
+            (
+              Number((item as any).user_id) === Number(userId) ||
+              Number((item as any).created_by) === Number(userId) ||
+              Number((item as any).user?.id) === Number(userId)
+            )
+
+          const slotClass = item
+            ? isOwn
+              ? "room-slot--own"
+              : "room-slot--other"
+            : "room-slot--free"
+
+          const label = item
+            ? timeMode === "kyiv"
+              ? `${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name ?? "Reserved"}`
+              : `${fmt(item.start_at)}-${fmt(item.end_at)} (${fmtKyiv(item.start_at)}-${fmtKyiv(item.end_at)} Kyiv) ${item.user_name ?? "Reserved"}`
+            : "FREE"
+
           return (
             <div
               key={time}
-              className="info room-slot"
-              style={{
-                color: item ? "#ffc0c0" : "#97ffbd",
-              }}
+              className={`info room-slot ${slotClass}`}
             >
               <span>{formatSlotTime(time)}</span>
 
-              <span>
-                {item
-                  ? timeMode === "kyiv"
-                    ? `${fmt(item.start_at)}-${fmt(item.end_at)} ${item.user_name ?? "Reserved"}`
-                    : `${fmt(item.start_at)}-${fmt(item.end_at)} (${fmtKyiv(item.start_at)}-${fmtKyiv(item.end_at)} Kyiv) ${item.user_name ?? "Reserved"}`
-                  : "FREE"}
-              </span>
+              <span>{label}</span>
             </div>
           )
         })}
