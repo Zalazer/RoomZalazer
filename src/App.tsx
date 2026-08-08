@@ -10,6 +10,7 @@ import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
 import AdminSettingsCard from "./components/AdminSettingsCard"
 import AdminSettingsModal from "./components/AdminSettingsModal"
+import ReminderPopup from "./components/ReminderPopup"
 import { useAppData, getEffectiveWorkingHours } from "./hooks/useAppData"
 import useReservationAlerts from "./hooks/useReservationAlerts"
 
@@ -25,6 +26,14 @@ const getSafeTimeZone = () => {
 
 const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
 const isHm = (v: string) => /^\d{2}:\d{2}$/.test(v)
+
+const safeUtcMs = (v?: string | null) => {
+  if (!v) return null
+  const raw = String(v).trim()
+  const d = new Date(raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`)
+  const ms = d.getTime()
+  return Number.isNaN(ms) ? null : ms
+}
 
 const parseReservationDate = (value: string, mode: "kyiv" | "local") => {
   const raw = String(value || "")
@@ -87,8 +96,8 @@ const toUtcFromZoneSafe = (date: string, time: string, zone: string) => {
     }).format(utcGuess)
 
     const match = rendered.match(
-  /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
-)
+      /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
+    )
 
     if (!match) return utcGuess
 
@@ -135,6 +144,17 @@ export default function App() {
   const [editingReservationId, setEditingReservationId] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<RoomSortField>("seats")
   const [showAdminSettings, setShowAdminSettings] = useState(false)
+  const [reminderPopup, setReminderPopup] = useState<{
+    open: boolean
+    type: "before_start" | "before_end" | null
+    reservation: any | null
+    endsAtMs: number | null
+  }>({
+    open: false,
+    type: null,
+    reservation: null,
+    endsAtMs: null,
+  })
 
   const safeNowUtcMs =
     typeof a.nowUtcMs === "number" && Number.isFinite(a.nowUtcMs)
@@ -146,6 +166,37 @@ export default function App() {
     [a.myReservations]
   )
 
+  const requestBrowserNotificationPermission = () => {
+    if (typeof window === "undefined") return
+    if (!("Notification" in window)) return
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {})
+    }
+  }
+
+  const playLoginTestSound = () => {
+    const audio = new Audio("/sounds/chime.mp3")
+    audio.currentTime = 0
+    audio.loop = false
+    audio.play().catch(() => {})
+    window.setTimeout(() => {
+      audio.pause()
+      audio.currentTime = 0
+    }, 2500)
+  }
+
+  const handleAuthAction = async (mode: "login" | "register") => {
+    playLoginTestSound()
+    requestBrowserNotificationPermission()
+
+    if (mode === "register") {
+      await a.register()
+      return
+    }
+
+    await a.login()
+  }
+
   useReservationAlerts({
     reservations: a.reservations,
     myReservationIds,
@@ -153,12 +204,36 @@ export default function App() {
     officeSettings: a.officeSettings,
     enabled: a.status !== "booting" && a.status !== "guest" && a.status !== "error",
     onNotify: ({ type, reservation, minutesLeft }) => {
-      const label = reservation.title || "Untitled reservation"
+      const targetMs =
+        type === "before_start"
+          ? safeUtcMs(reservation.start_at)
+          : safeUtcMs(reservation.end_at)
 
-      if (type === "before_start") {
-        console.log(`Reminder: "${label}" starts in ${minutesLeft} min`)
-      } else {
-        console.log(`Reminder: "${label}" ends in ${minutesLeft} min`)
+      if (targetMs == null) return
+
+      setReminderPopup({
+        open: true,
+        type,
+        reservation,
+        endsAtMs: targetMs,
+      })
+
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "granted") {
+          const title =
+            type === "before_start"
+              ? "Reservation starts soon"
+              : "Reservation ends soon"
+
+          const body =
+            type === "before_start"
+              ? `${reservation.title || "Untitled reservation"} starts in ${minutesLeft} min`
+              : `${reservation.title || "Untitled reservation"} ends in ${minutesLeft} min`
+
+          try {
+            new Notification(title, { body })
+          } catch {}
+        }
       }
     },
   })
@@ -322,7 +397,9 @@ export default function App() {
 
           <button
             className="primary"
-            onClick={a.registerMode ? a.register : a.login}
+            onClick={() =>
+              handleAuthAction(a.registerMode ? "register" : "login")
+            }
           >
             {a.registerMode ? "Register" : "Login"}
           </button>
@@ -519,6 +596,21 @@ export default function App() {
         updateOfficeSettings={a.updateOfficeSettings}
         upsertOfficeCalendarDay={a.upsertOfficeCalendarDay}
         deleteOfficeCalendarDay={a.deleteOfficeCalendarDay}
+      />
+
+      <ReminderPopup
+        open={reminderPopup.open}
+        type={reminderPopup.type}
+        reservation={reminderPopup.reservation}
+        endsAtMs={reminderPopup.endsAtMs}
+        onClose={() =>
+          setReminderPopup({
+            open: false,
+            type: null,
+            reservation: null,
+            endsAtMs: null,
+          })
+        }
       />
 
       {selectedRoom && (

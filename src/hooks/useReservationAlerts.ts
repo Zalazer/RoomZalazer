@@ -24,16 +24,13 @@ const safeUtcMs = (v?: string | null) => {
   return Number.isNaN(ms) ? null : ms
 }
 
-const playReservationAlert = () => {
-  const audio = new Audio("/sounds/chime.mp3")
-  audio.loop = true
-  audio.play().catch(() => {})
-
-  window.setTimeout(() => {
-    audio.pause()
-    audio.currentTime = 0
-  }, 10000)
-}
+const getReminderMinutes = (officeSettings: OfficeSettings | null) =>
+  Number(
+    (officeSettings as any)?.reservation_reminder_minutes ??
+    (officeSettings as any)?.booking_reminder_minutes ??
+    (officeSettings as any)?.notify_before_minutes ??
+    10
+  ) || 10
 
 export default function useReservationAlerts({
   reservations,
@@ -44,15 +41,11 @@ export default function useReservationAlerts({
   onNotify,
 }: Params) {
   const firedRef = useRef<Set<string>>(new Set())
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const stopTimerRef = useRef<number | null>(null)
 
-  const notifyBeforeStartMinutes =
-    Number(
-      (officeSettings as any)?.reservation_reminder_minutes ??
-      (officeSettings as any)?.booking_reminder_minutes ??
-      10
-    ) || 10
-
-  const notifyBeforeEndMinutes = 10
+  const notifyBeforeStartMinutes = getReminderMinutes(officeSettings)
+  const notifyBeforeEndMinutes = getReminderMinutes(officeSettings)
 
   const myReservations = useMemo(
     () =>
@@ -64,20 +57,62 @@ export default function useReservationAlerts({
   )
 
   useEffect(() => {
+    audioRef.current = new Audio("/sounds/chime.mp3")
+    audioRef.current.preload = "auto"
+
+    return () => {
+      if (stopTimerRef.current != null) {
+        window.clearTimeout(stopTimerRef.current)
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      }
+    }
+  }, [])
+
+  const playReservationAlert = () => {
+    const audio = audioRef.current ?? new Audio("/sounds/chime.mp3")
+    audioRef.current = audio
+
+    if (stopTimerRef.current != null) {
+      window.clearTimeout(stopTimerRef.current)
+      stopTimerRef.current = null
+    }
+
+    audio.pause()
+    audio.currentTime = 0
+    audio.loop = false
+
+    audio.play().catch(() => {})
+
+    stopTimerRef.current = window.setTimeout(() => {
+      audio.pause()
+      audio.currentTime = 0
+      stopTimerRef.current = null
+    }, 10000)
+  }
+
+  useEffect(() => {
     if (!enabled) return
+
+    const activeKeys = new Set<string>()
 
     for (const reservation of myReservations) {
       const startMs = safeUtcMs(reservation.start_at)
       const endMs = safeUtcMs(reservation.end_at)
 
       if (startMs == null || endMs == null) continue
-      if (endMs <= nowUtcMs) continue
 
       const startReminderAt = startMs - notifyBeforeStartMinutes * 60_000
       const endReminderAt = endMs - notifyBeforeEndMinutes * 60_000
 
       const startKey = `start-${reservation.id}-${startReminderAt}`
       const endKey = `end-${reservation.id}-${endReminderAt}`
+
+      if (endMs > nowUtcMs) activeKeys.add(startKey)
+      if (endMs > nowUtcMs) activeKeys.add(endKey)
 
       if (
         nowUtcMs >= startReminderAt &&
@@ -105,6 +140,12 @@ export default function useReservationAlerts({
           reservation,
           minutesLeft: notifyBeforeEndMinutes,
         })
+      }
+    }
+
+    for (const key of Array.from(firedRef.current)) {
+      if (!activeKeys.has(key)) {
+        firedRef.current.delete(key)
       }
     }
   }, [
