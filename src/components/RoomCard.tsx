@@ -1,4 +1,6 @@
+import { useState } from "react"
 import Timeline from "./Timeline"
+import RoomWeekGridModal from "./RoomWeekGridModal"
 import {
   getEffectiveWorkingHours,
   type Room,
@@ -20,6 +22,8 @@ type Props = {
   myReservationIds?: Set<number>
 }
 
+const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
+
 const toYmd = (date: Date, zone: string) => {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: zone,
@@ -29,11 +33,14 @@ const toYmd = (date: Date, zone: string) => {
   }).formatToParts(date)
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
-
   return `${get("year")}-${get("month")}-${get("day")}`
 }
 
-const parseUtc = (v: string) => new Date(`${String(v).replace(" ", "T")}Z`)
+const parseUtc = (v: string) => {
+  const raw = String(v || "").trim()
+  const normalized = raw.endsWith("Z") ? raw : `${raw.replace(" ", "T")}Z`
+  return new Date(normalized)
+}
 
 const toUtcFromZone = (date: string, time: string, zone: string) => {
   const [y, m, d] = date.split("-").map(Number)
@@ -71,6 +78,7 @@ const getOfficeDateForSelectedDate = (
   selectedDate: string,
   timeMode: "kyiv" | "local"
 ) => {
+  if (!isYmd(selectedDate)) return selectedDate
   if (timeMode === "kyiv") return selectedDate
 
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -91,6 +99,8 @@ export default function RoomCard({
   onClick,
   myReservationIds,
 }: Props) {
+  const [showWeekGrid, setShowWeekGrid] = useState(false)
+
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
 
@@ -180,14 +190,32 @@ export default function RoomCard({
 
   const isPastDay = officeDate < todayInKyiv
   const isToday = officeDate === todayInKyiv
+  const viewZone = timeMode === "kyiv" ? "Europe/Kyiv" : localZone
 
-  const futureBookableStarts = times
-    .filter((time) => {
-      if (!dayMeta.start || !dayMeta.end) return false
-      return time >= dayMeta.start && time < dayMeta.end
-    })
-    .map((time) => toUtcFromZone(officeDate, time, "Europe/Kyiv").getTime())
-    .filter((startMs) => startMs > nowUtcMs)
+  const futureBookableStarts = dayMeta.closed
+    ? []
+    : times
+        .map((time) => {
+          const slotUtc = toUtcFromZone(selectedDate, time, viewZone).getTime()
+          return { time, slotUtc }
+        })
+        .filter(({ slotUtc }) => {
+          if (!dayMeta.start || !dayMeta.end) return false
+
+          const officeStartUtc = toUtcFromZone(
+            officeDate,
+            dayMeta.start,
+            "Europe/Kyiv"
+          ).getTime()
+
+          const officeEndUtc = toUtcFromZone(
+            officeDate,
+            dayMeta.end,
+            "Europe/Kyiv"
+          ).getTime()
+
+          return slotUtc >= officeStartUtc && slotUtc < officeEndUtc && slotUtc > nowUtcMs
+        })
 
   const hasFutureBookableSlot = futureBookableStarts.length > 0
 
@@ -243,55 +271,81 @@ export default function RoomCard({
   ].filter(Boolean)
 
   return (
-    <div
-      className="room-card"
-      onClick={onClick}
-    >
-      <div className="room-head">
-        <div className="room-name">
-          <div
-            className="room-title"
-            title={room.name}
-          >
-            {room.name}
+    <>
+      <div
+        className="room-card"
+        onClick={onClick}
+      >
+        <div className="room-head">
+          <div className="room-name">
+            <div
+              className="room-title"
+              title={room.name}
+            >
+              {room.name}
+            </div>
+
+            <div
+              className="room-meta-line"
+              title={metaParts.join(" · ")}
+            >
+              {metaParts.join(" · ")}
+            </div>
           </div>
 
-          <div
-            className="room-meta-line"
-            title={metaParts.join(" · ")}
-          >
-            {metaParts.join(" · ")}
-          </div>
+<button
+  type="button"
+  className="secondary header-btn"
+  onClick={(e) => {
+    e.stopPropagation()
+    setShowWeekGrid(true)
+  }}
+>
+  Week grid
+</button>
+        </div>
+
+        <Timeline
+          roomId={room.id}
+          reservations={reservations}
+          selectedDate={selectedDate}
+          timeMode={timeMode}
+          times={times}
+          myReservationIds={myReservationIds}
+          officeSettings={officeSettings}
+          officeCalendar={officeCalendar}
+        />
+
+        {room.description && <div className="desc">{room.description}</div>}
+
+        {!!room.features?.length && (
+          <div className="small">{room.features.join(" • ")}</div>
+        )}
+
+        {room.equipment && (
+          <div className="small">Equipment: {room.equipment}</div>
+        )}
+
+        <div
+          className={`small ${statusClass}`}
+          style={{ fontWeight: 600 }}
+        >
+          {statusText}
         </div>
       </div>
 
-      <Timeline
-        roomId={room.id}
+      <RoomWeekGridModal
+        show={showWeekGrid}
+        room={room}
         reservations={reservations}
         selectedDate={selectedDate}
         timeMode={timeMode}
         times={times}
-        myReservationIds={myReservationIds}
         officeSettings={officeSettings}
         officeCalendar={officeCalendar}
+        myReservationIds={myReservationIds}
+        onClose={() => setShowWeekGrid(false)}
       />
-
-      {room.description && <div className="desc">{room.description}</div>}
-
-      {!!room.features?.length && (
-        <div className="small">{room.features.join(" • ")}</div>
-      )}
-
-      {room.equipment && (
-        <div className="small">Equipment: {room.equipment}</div>
-      )}
-
-      <div
-        className={`small ${statusClass}`}
-        style={{ fontWeight: 600 }}
-      >
-        {statusText}
-      </div>
-    </div>
+    </>
   )
 }
