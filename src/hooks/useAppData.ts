@@ -575,6 +575,11 @@ export function useAppData() {
   const [registerError, setRegisterError] = useState("")
   const [isReserving, setIsReserving] = useState(false)
 
+  const [adminSettingsError, setAdminSettingsError] = useState("")
+  const [adminSettingsSuccess, setAdminSettingsSuccess] = useState("")
+  const [isSavingAdminSettings, setIsSavingAdminSettings] = useState(false)
+
+
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
 
@@ -707,6 +712,17 @@ export function useAppData() {
     return { ok: false as const, timeInfo }
   }
 
+
+  async function reloadOfficeSettings() {
+    const r = await api("/office/settings")
+    if (r?.ok && r.settings) {
+      setOfficeSettings(r.settings)
+      return r.settings as OfficeSettings
+    }
+    return null
+  }
+
+
   async function loadCalendarForDate(date: string) {
     if (!isYmd(date)) return
     const month = date.slice(0, 7)
@@ -761,6 +777,99 @@ export function useAppData() {
     setSelectedDate((prev) => (prev === keepDate ? prev : keepDate))
     setStatus("ready")
     return true
+  }
+
+
+  async function updateOfficeSettings(
+    payload: Partial<OfficeSettings>
+  ) {
+    setAdminSettingsError("")
+    setAdminSettingsSuccess("")
+    setIsSavingAdminSettings(true)
+
+    const r = await api("/office/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    setIsSavingAdminSettings(false)
+
+    if (!r?.ok) {
+      const message = r?.error || "Failed to update office settings."
+      setAdminSettingsError(message)
+      return { ok: false as const, error: message }
+    }
+
+    await reloadOfficeSettings()
+
+    if (selectedDate && isYmd(selectedDate)) {
+      await loadCalendarForDate(selectedDate)
+    }
+
+    setAdminSettingsSuccess("Office settings updated.")
+    return { ok: true as const }
+  }
+
+
+  async function upsertOfficeCalendarDay(payload: OfficeCalendarDay) {
+    setAdminSettingsError("")
+    setAdminSettingsSuccess("")
+    setIsSavingAdminSettings(true)
+
+    const r = await api("/office/calendar", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: payload.date,
+        is_working_day: Number(payload.is_working_day) ? 1 : 0,
+        working_start: payload.working_start || null,
+        working_end: payload.working_end || null,
+        title: String(payload.title || "").trim() || null,
+      }),
+    })
+
+    setIsSavingAdminSettings(false)
+
+    if (!r?.ok) {
+      const message = r?.error || "Failed to save calendar day."
+      setAdminSettingsError(message)
+      return { ok: false as const, error: message }
+    }
+
+    if (selectedDate && isYmd(selectedDate)) {
+      await loadCalendarForDate(selectedDate)
+    }
+
+    setAdminSettingsSuccess("Calendar day saved.")
+    return { ok: true as const }
+  }
+
+
+
+  async function deleteOfficeCalendarDay(date: string) {
+    setAdminSettingsError("")
+    setAdminSettingsSuccess("")
+    setIsSavingAdminSettings(true)
+
+    const r = await api(`/office/calendar?date=${encodeURIComponent(date)}`, {
+      method: "DELETE",
+    })
+
+    setIsSavingAdminSettings(false)
+
+    if (!r?.ok) {
+      const message = r?.error || "Failed to delete calendar override."
+      setAdminSettingsError(message)
+      return { ok: false as const, error: message }
+    }
+
+    if (selectedDate && isYmd(selectedDate)) {
+      await loadCalendarForDate(selectedDate)
+    }
+
+    setAdminSettingsSuccess("Calendar override deleted.")
+    return { ok: true as const }
   }
 
 
@@ -1051,6 +1160,11 @@ export function useAppData() {
     setSelectedRoom(null)
     setShowProfileModal(false)
     _setShowModal(false)
+
+    setAdminSettingsError("")
+    setAdminSettingsSuccess("")
+    setIsSavingAdminSettings(false)
+
     setStatus("guest")
   }
 
@@ -1420,5 +1534,13 @@ export function useAppData() {
 
     officeSettings,
     officeCalendar,
+
+    adminSettingsError,
+    adminSettingsSuccess,
+    isSavingAdminSettings,
+
+    updateOfficeSettings,
+    upsertOfficeCalendarDay,
+    deleteOfficeCalendarDay,
   }
 }

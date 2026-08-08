@@ -8,6 +8,8 @@ import RoomDetailsModal from "./components/RoomDetailsModal"
 import ReservationList from "./components/ReservationList"
 import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
+import AdminSettingsCard from "./components/AdminSettingsCard"
+import AdminSettingsModal from "./components/AdminSettingsModal"
 import { useAppData, getEffectiveWorkingHours } from "./hooks/useAppData"
 import useReservationAlerts from "./hooks/useReservationAlerts"
 
@@ -132,6 +134,7 @@ export default function App() {
   const a = useAppData()
   const [editingReservationId, setEditingReservationId] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<RoomSortField>("seats")
+  const [showAdminSettings, setShowAdminSettings] = useState(false)
 
   const safeNowUtcMs =
     typeof a.nowUtcMs === "number" && Number.isFinite(a.nowUtcMs)
@@ -365,6 +368,16 @@ export default function App() {
           }}
         />
 
+        {a.user?.role === "admin" && (
+          <AdminSettingsCard
+            officeSettings={a.officeSettings}
+            officeCalendar={a.officeCalendar}
+            selectedDate={a.selectedDate}
+            timeMode={a.timeMode}
+            onOpen={() => setShowAdminSettings(true)}
+          />
+        )}
+
         {a.showCurrent && (
           <ReservationList
             title="Current Reservations"
@@ -492,6 +505,20 @@ export default function App() {
         success={a.profileSuccess}
         onSave={a.updateProfile}
         onClose={() => a.setShowProfileModal(false)}
+      />
+
+      <AdminSettingsModal
+        open={showAdminSettings}
+        onClose={() => setShowAdminSettings(false)}
+        officeSettings={a.officeSettings}
+        officeCalendar={a.officeCalendar}
+        selectedDate={a.selectedDate}
+        adminSettingsError={a.adminSettingsError}
+        adminSettingsSuccess={a.adminSettingsSuccess}
+        isSavingAdminSettings={a.isSavingAdminSettings}
+        updateOfficeSettings={a.updateOfficeSettings}
+        upsertOfficeCalendarDay={a.upsertOfficeCalendarDay}
+        deleteOfficeCalendarDay={a.deleteOfficeCalendarDay}
       />
 
       {selectedRoom && (
