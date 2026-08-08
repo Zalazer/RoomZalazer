@@ -8,7 +8,7 @@ import RoomDetailsModal from "./components/RoomDetailsModal"
 import ReservationList from "./components/ReservationList"
 import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
-import { useAppData } from "./hooks/useAppData"
+import { useAppData, getEffectiveWorkingHours } from "./hooks/useAppData"
 
 type RoomSortField = "name" | "floor" | "seats"
 
@@ -142,22 +142,28 @@ export default function App() {
     [a.myReservations]
   )
 
-  const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
+    const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
   const todayInKyiv = formatYmdInZone(new Date(safeNowUtcMs), "Europe/Kyiv")
-  const officeEnd = a.officeSettings?.working_day_end ?? ""
+
+  const dayMeta = getEffectiveWorkingHours(
+    officeDate,
+    a.officeSettings,
+    a.officeCalendar
+  )
 
   const officeEndUtcMs =
-    officeEnd && isYmd(officeDate) && isHm(officeEnd)
-      ? toUtcFromZoneSafe(officeDate, officeEnd, "Europe/Kyiv").getTime()
+    dayMeta.end && isYmd(officeDate) && isHm(dayMeta.end)
+      ? toUtcFromZoneSafe(officeDate, dayMeta.end, "Europe/Kyiv").getTime()
       : null
 
   const isCreateDisabledForSelectedDay =
-    isYmd(officeDate) &&
-    (officeDate < todayInKyiv ||
-      (officeDate === todayInKyiv &&
-        officeEndUtcMs != null &&
-        Number.isFinite(officeEndUtcMs) &&
-        safeNowUtcMs >= officeEndUtcMs))
+    !isYmd(officeDate) ||
+    dayMeta.closed ||
+    officeDate < todayInKyiv ||
+    (officeDate === todayInKyiv &&
+      officeEndUtcMs != null &&
+      Number.isFinite(officeEndUtcMs) &&
+      safeNowUtcMs >= officeEndUtcMs)
 
   const sortedRooms = useMemo(() => {
     const rooms = [...a.rooms]
@@ -389,28 +395,31 @@ export default function App() {
         />
 
         <WeekSelector
-          selectedDate={a.selectedDate}
-          setSelectedDate={a.setSelectedDate}
-          formatDate={a.formatDate}
-          todayDate={a.todayDate}
-          formatWeekdayShort={a.formatWeekdayShort}
-          formatDayNumber={a.formatDayNumber}
-        />
+  selectedDate={a.selectedDate}
+  setSelectedDate={a.setSelectedDate}
+  formatDate={a.formatDate}
+  todayDate={a.todayDate}
+  formatWeekdayShort={a.formatWeekdayShort}
+  formatDayNumber={a.formatDayNumber}
+  officeSettings={a.officeSettings}
+  officeCalendar={a.officeCalendar}
+/>
 
         {sortedRooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            reservations={a.reservations}
-            selectedDate={a.selectedDate}
-            timeMode={a.timeMode}
-            times={a.TIMES}
-            officeSettings={a.officeSettings}
-            nowUtcMs={safeNowUtcMs}
-            onClick={() => a.setSelectedRoom(room)}
-            myReservationIds={myReservationIds}
-          />
-        ))}
+  <RoomCard
+    key={room.id}
+    room={room}
+    reservations={a.reservations}
+    selectedDate={a.selectedDate}
+    timeMode={a.timeMode}
+    times={a.TIMES}
+    officeSettings={a.officeSettings}
+    officeCalendar={a.officeCalendar}
+    nowUtcMs={safeNowUtcMs}
+    onClick={() => a.setSelectedRoom(room)}
+    myReservationIds={myReservationIds}
+  />
+))}
 
         <div className="footer">RoomZalazer • Google Calendar Style</div>
       </div>
@@ -467,7 +476,7 @@ export default function App() {
         onClose={() => a.setShowProfileModal(false)}
       />
 
-      {selectedRoom && (
+            {selectedRoom && (
         <RoomDetailsModal
           room={selectedRoom}
           reservations={a.reservations}
@@ -475,6 +484,9 @@ export default function App() {
           timeMode={a.timeMode}
           times={a.TIMES}
           myReservationIds={myReservationIds}
+          officeSettings={a.officeSettings}
+          officeCalendar={a.officeCalendar}
+          nowUtcMs={safeNowUtcMs}
           onClose={() => a.setSelectedRoom(null)}
           onCreate={() => {
             if (isCreateDisabledForSelectedDay) return

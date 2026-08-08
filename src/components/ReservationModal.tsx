@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Room, Reservation } from "../hooks/useAppData"
 
 type Props = {
@@ -167,6 +167,18 @@ export default function ReservationModal({
     typeof nowUtcMs === "number" && Number.isFinite(nowUtcMs)
       ? nowUtcMs
       : Date.now()
+
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const [titleTouched, setTitleTouched] = useState(false)
+  const titleTrimmed = title.trim()
+  const titleRequiredError =
+    titleTouched && !titleTrimmed ? "Meeting title is required." : ""
+
+  useEffect(() => {
+    if (!show) {
+      setTitleTouched(false)
+    }
+  }, [show])
 
   const floorLabel = (n: number) => {
     if (n === 1) return "1st floor"
@@ -429,13 +441,35 @@ export default function ReservationModal({
     : ["Select a room to see room details"]
 
   const noSlotsAvailable =
-  timeMode === "kyiv" &&
-  show &&
-  !!roomId &&
-  !loading &&
-  !isEndedDay &&
-  !safeStart &&
-  !safeEnd
+    timeMode === "kyiv" &&
+    show &&
+    !!roomId &&
+    !loading &&
+    !isEndedDay &&
+    !safeStart &&
+    !safeEnd
+
+  const reserveDisabled =
+    loading ||
+    isEndedDay ||
+    noSlotsAvailable ||
+    !titleTrimmed ||
+    !roomId ||
+    !safeStart ||
+    !safeEnd ||
+    !availableEndTimes.length
+
+  const titleErrorId = "reservation-title-error"
+
+  const handleReserveClick = () => {
+    if (!titleTrimmed) {
+      setTitleTouched(true)
+      titleInputRef.current?.focus()
+      return
+    }
+
+    onReserve()
+  }
 
   return (
     <div className="modal">
@@ -484,13 +518,37 @@ export default function ReservationModal({
           </div>
         )}
 
-        <label>Meeting title</label>
+        <label htmlFor="reservation-title-input">Meeting title</label>
         <input
+          id="reservation-title-input"
+          ref={titleInputRef}
           placeholder="Enter meeting title..."
           value={title}
           disabled={loading || isEndedDay}
-          onChange={(e) => setTitle(e.target.value)}
+          aria-invalid={titleRequiredError ? "true" : "false"}
+          aria-describedby={titleRequiredError ? titleErrorId : undefined}
+          onChange={(e) => {
+            const nextValue = e.target.value
+            setTitle(nextValue)
+
+            if (titleTouched && nextValue.trim()) {
+              setTitleTouched(false)
+            }
+          }}
+          onBlur={() => {
+            setTitleTouched(true)
+          }}
         />
+
+        {!!titleRequiredError && (
+          <div
+            id={titleErrorId}
+            className="error"
+            aria-live="assertive"
+          >
+            {titleRequiredError}
+          </div>
+        )}
 
         {!!error && <div className="error">{error}</div>}
 
@@ -621,17 +679,8 @@ export default function ReservationModal({
         <div className="modal-buttons">
           <button
             className="primary"
-            disabled={
-              loading ||
-              isEndedDay ||
-              noSlotsAvailable ||
-              !title.trim() ||
-              !roomId ||
-              !safeStart ||
-              !safeEnd ||
-              !availableEndTimes.length
-            }
-            onClick={onReserve}
+            disabled={reserveDisabled && !!titleTrimmed === false ? false : reserveDisabled}
+            onClick={handleReserveClick}
           >
             {loading ? "Saving..." : editing ? "Save Changes" : "Reserve"}
           </button>

@@ -15,6 +15,8 @@ box-sizing:border-box
 --blue:#52a5ff;
 --purple:#b184ff;
 --muted:#b8beca;
+--timeline-inactive:rgba(255,255,255,.16);
+--timeline-inactive-border:rgba(255,255,255,.06);
 --own-reservation-bg:rgba(82,165,255,.10);
 --own-reservation-border:rgba(82,165,255,.34);
 --own-reservation-text:#93c5fd;
@@ -214,13 +216,15 @@ display:flex;
 gap:2px;
 overflow:hidden;
 border-radius:10px;
-margin-bottom:10px
+margin-bottom:10px;
+padding:1px 0
 }
 
 .t{
 height:14px;
 flex:1;
-min-width:0
+min-width:0;
+border-radius:3px
 }
 
 .tf{
@@ -229,6 +233,11 @@ background:var(--green)
 
 .tr{
 background:var(--red)
+}
+
+.tx{
+background:var(--timeline-inactive);
+box-shadow:inset 0 0 0 1px var(--timeline-inactive-border)
 }
 
 .to,

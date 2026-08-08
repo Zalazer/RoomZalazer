@@ -1,5 +1,11 @@
 import Timeline from "./Timeline"
-import type { Room, Reservation } from "../hooks/useAppData"
+import {
+  getEffectiveWorkingHours,
+  type Room,
+  type Reservation,
+  type OfficeCalendarDay,
+  type OfficeSettings,
+} from "../hooks/useAppData"
 
 type Props = {
   room: Room
@@ -7,7 +13,8 @@ type Props = {
   selectedDate: string
   timeMode: "kyiv" | "local"
   times: string[]
-  officeSettings: any
+  officeSettings: OfficeSettings | null
+  officeCalendar: OfficeCalendarDay[]
   nowUtcMs: number
   onClick: () => void
   myReservationIds?: Set<number>
@@ -79,6 +86,7 @@ export default function RoomCard({
   timeMode,
   times,
   officeSettings,
+  officeCalendar,
   nowUtcMs,
   onClick,
   myReservationIds,
@@ -157,20 +165,26 @@ export default function RoomCard({
     }
   }
 
-  const officeEnd = officeSettings?.working_day_end ?? ""
-  const officeStart = officeSettings?.working_day_start ?? ""
+  const dayMeta = getEffectiveWorkingHours(
+    officeDate,
+    officeSettings,
+    officeCalendar
+  )
+
   const todayInKyiv = toYmd(new Date(nowUtcMs), "Europe/Kyiv")
 
   const officeEndUtcMs =
-    officeEnd ? toUtcFromZone(officeDate, officeEnd, "Europe/Kyiv").getTime() : null
+    dayMeta.end
+      ? toUtcFromZone(officeDate, dayMeta.end, "Europe/Kyiv").getTime()
+      : null
 
   const isPastDay = officeDate < todayInKyiv
   const isToday = officeDate === todayInKyiv
 
   const futureBookableStarts = times
     .filter((time) => {
-      if (!officeStart || !officeEnd) return true
-      return time >= officeStart && time < officeEnd
+      if (!dayMeta.start || !dayMeta.end) return false
+      return time >= dayMeta.start && time < dayMeta.end
     })
     .map((time) => toUtcFromZone(officeDate, time, "Europe/Kyiv").getTime())
     .filter((startMs) => startMs > nowUtcMs)
@@ -183,32 +197,38 @@ export default function RoomCard({
   })
 
   const isBookingClosedForToday =
+    !dayMeta.closed &&
     !active &&
     isToday &&
     !hasFutureBookableSlot
 
   const isEndedDay =
     isPastDay ||
-    (!!officeEndUtcMs && officeDate === todayInKyiv && nowUtcMs >= officeEndUtcMs)
+    (!dayMeta.closed &&
+      !!officeEndUtcMs &&
+      officeDate === todayInKyiv &&
+      nowUtcMs >= officeEndUtcMs)
 
-  const statusText = active
-    ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
-    : isBookingClosedForToday
-      ? officeEnd
-        ? `Free till ${formatOfficeEnd(officeDate, officeEnd)} · booking closed`
-        : "Booking closed"
-      : isPastDay
-        ? "This working day has ended."
-        : nextUpcoming
-          ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
-          : officeEnd
-            ? `Free till ${formatOfficeEnd(officeDate, officeEnd)}`
-            : "Available"
+  const statusText = dayMeta.closed
+    ? dayMeta.title
+      ? `Closed for this day · ${dayMeta.title}`
+      : "Closed for this day"
+    : active
+      ? `Busy till ${formatStatusTime(new Date(busyUntilMs!))}`
+      : isBookingClosedForToday
+        ? "Booking closed for today"
+        : isEndedDay
+          ? "This working day has ended."
+          : nextUpcoming
+            ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
+            : dayMeta.end
+              ? `Free till ${formatOfficeEnd(officeDate, dayMeta.end)}`
+              : "Available"
 
   const statusClass =
     active
       ? "reserved"
-      : isBookingClosedForToday || isEndedDay
+      : dayMeta.closed || isBookingClosedForToday || isEndedDay
         ? "ended"
         : "available"
 
@@ -252,6 +272,8 @@ export default function RoomCard({
         timeMode={timeMode}
         times={times}
         myReservationIds={myReservationIds}
+        officeSettings={officeSettings}
+        officeCalendar={officeCalendar}
       />
 
       {room.description && <div className="desc">{room.description}</div>}

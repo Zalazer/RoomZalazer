@@ -1,3 +1,15 @@
+type OfficeSettings = {
+  allow_weekend_booking: number
+}
+
+type OfficeCalendarDay = {
+  date: string
+  is_working_day: number
+  working_start: string | null
+  working_end: string | null
+  title: string | null
+}
+
 type Props = {
   selectedDate: string
   setSelectedDate: (v: string) => void
@@ -5,6 +17,8 @@ type Props = {
   todayDate: string
   formatWeekdayShort: (v: string) => string
   formatDayNumber: (v: string) => string
+  officeSettings: OfficeSettings | null
+  officeCalendar: OfficeCalendarDay[]
 }
 
 const pad = (n: number) => String(n).padStart(2, "0")
@@ -19,12 +33,59 @@ const fromYmd = (value: string) => {
 const toYmd = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
+const getCalendarOverride = (
+  officeCalendar: OfficeCalendarDay[],
+  value: string
+) => officeCalendar.find((v) => v.date === value) || null
+
+const isWeekend = (date: Date) => {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+const getDayState = (
+  value: string,
+  officeSettings: OfficeSettings | null,
+  officeCalendar: OfficeCalendarDay[]
+) => {
+  const override = getCalendarOverride(officeCalendar, value)
+
+  if (override) {
+    return {
+      isWorking: Number(override.is_working_day) === 1,
+      isOverride: true,
+      title: override.title || "",
+    }
+  }
+
+  const date = fromYmd(value)
+  const weekend = isWeekend(date)
+  const allowWeekend = Number(officeSettings?.allow_weekend_booking ?? 0) === 1
+
+  if (weekend && !allowWeekend) {
+    return {
+      isWorking: false,
+      isOverride: false,
+      title: "",
+    }
+  }
+
+  return {
+    isWorking: true,
+    isOverride: false,
+    title: "",
+  }
+}
+
 export default function WeekSelector({
   selectedDate,
   setSelectedDate,
+  formatDate,
   todayDate,
   formatWeekdayShort,
   formatDayNumber,
+  officeSettings,
+  officeCalendar,
 }: Props) {
   const safeToday = isYmd(todayDate) ? todayDate : toYmd(new Date())
 
@@ -135,11 +196,15 @@ export default function WeekSelector({
           d.setDate(weekStart.getDate() + i)
 
           const value = toYmd(d)
+          const dayState = getDayState(value, officeSettings, officeCalendar)
+          const isSelected = value === selectedDate
+          const isToday = value === safeToday
+          const isClosed = !dayState.isWorking
 
           return (
             <button
               key={value}
-              className={value === selectedDate ? "primary" : "secondary"}
+              className={isSelected ? "primary" : "secondary"}
               style={{
                 padding: "6px",
                 fontSize: "12px",
@@ -149,15 +214,28 @@ export default function WeekSelector({
                 flexDirection: "column",
                 alignItems: "center",
                 flex: 1,
-                opacity: i >= 5 ? 0.85 : 1,
+                opacity: isClosed ? 0.45 : 1,
+                border:
+                  !isSelected && isToday
+                    ? "1px solid rgba(255,255,255,.35)"
+                    : undefined,
                 background:
-                  value === selectedDate
+                  isSelected
                     ? undefined
-                    : i >= 5
+                    : isClosed
                     ? "rgba(255,87,87,.15)"
+                    : dayState.isOverride
+                    ? "rgba(80,180,120,.14)"
                     : undefined,
               }}
               onClick={() => setSelectedDate(value)}
+              title={
+                isClosed
+                  ? dayState.title || "Office closed"
+                  : dayState.isOverride
+                  ? dayState.title || "Custom working day"
+                  : formatDate(value)
+              }
             >
               <span>{formatWeekdayShort(value)}</span>
               <span>{formatDayNumber(value)}</span>

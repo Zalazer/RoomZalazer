@@ -260,25 +260,65 @@ function getCalendarDay(calendar: OfficeCalendarDay[], selectedDate: string) {
   return calendar.find((v) => v.date === selectedDate) || null
 }
 
-function getEffectiveWorkingHours(
+function isWeekendYmd(value: string) {
+  if (!isYmd(value)) return false
+  const [y, m, d] = value.split("-").map(Number)
+  const date = new Date(y, m - 1, d)
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+export function getEffectiveWorkingHours(
   selectedDate: string,
   officeSettings: OfficeSettings | null,
   officeCalendar: OfficeCalendarDay[]
 ) {
-  if (!officeSettings) return { closed: false, start: "", end: "" }
+  if (!officeSettings || !isYmd(selectedDate)) {
+    return {
+      closed: false,
+      start: "",
+      end: "",
+      isOverride: false,
+      title: "",
+    }
+  }
 
   const day = getCalendarDay(officeCalendar, selectedDate)
 
-  if (day && Number(day.is_working_day) === 0) {
-    return { closed: true, start: "", end: "" }
+  if (day) {
+    const isWorking = Number(day.is_working_day) === 1
+
+    return {
+      closed: !isWorking,
+      start: isWorking ? day.working_start || officeSettings.working_day_start : "",
+      end: isWorking ? day.working_end || officeSettings.working_day_end : "",
+      isOverride: true,
+      title: day.title || "",
+    }
+  }
+
+  const allowWeekend = Number(officeSettings.allow_weekend_booking) === 1
+  const weekend = isWeekendYmd(selectedDate)
+
+  if (weekend && !allowWeekend) {
+    return {
+      closed: true,
+      start: "",
+      end: "",
+      isOverride: false,
+      title: "",
+    }
   }
 
   return {
     closed: false,
-    start: day?.working_start || officeSettings.working_day_start,
-    end: day?.working_end || officeSettings.working_day_end,
+    start: officeSettings.working_day_start,
+    end: officeSettings.working_day_end,
+    isOverride: false,
+    title: "",
   }
 }
+
 
 const unwrapRooms = (payload: any): Room[] => {
   if (Array.isArray(payload)) return payload
@@ -705,6 +745,26 @@ export function useAppData() {
     return true
   }
 
+
+  async function refreshAppDataPreservingDate(dateToKeep?: string) {
+    const keepDate =
+      dateToKeep && isYmd(dateToKeep)
+        ? dateToKeep
+        : selectedDate && isYmd(selectedDate)
+          ? selectedDate
+          : getTodayYmd(timeMode, serverNow, serverReceivedAt)
+
+    const privateOk = await loadPrivateBootstrap()
+    if (!privateOk) return false
+
+    await loadCalendarForDate(keepDate)
+    setSelectedDate((prev) => (prev === keepDate ? prev : keepDate))
+    setStatus("ready")
+    return true
+  }
+
+
+
   async function initApp() {
     setStatus("booting")
     setAppError("")
@@ -818,6 +878,11 @@ export function useAppData() {
       if (!editing) {
         const officeDate = getOfficeDateForSelectedDate(selectedDate, timeMode)
         const dayMeta = getEffectiveWorkingHours(officeDate, officeSettings, officeCalendar)
+
+        if (dayMeta.closed) {
+          setReserveError("Office is closed on selected day.")
+          return
+        }
 
         const fallbackStart =
           timeMode === "kyiv"
@@ -1057,10 +1122,11 @@ export function useAppData() {
   async function deleteReservation(id: number) {
     if (!confirm("Cancel reservation?")) return
     await api(`/reservations/${id}`, { method: "DELETE" })
-    await initApp()
+    await refreshAppDataPreservingDate(selectedDate)
   }
 
-  async function reserveRoom() {
+
+    async function reserveRoom() {
     setReserveError("")
 
     if (!selectedDate || !isYmd(selectedDate)) {
@@ -1072,6 +1138,8 @@ export function useAppData() {
       setReserveError("Office settings not loaded.")
       return
     }
+
+    const dateToKeep = selectedDate
 
     if (editing && editingId !== null) {
       const r = await api(`/reservations/${editingId}`, {
@@ -1094,7 +1162,7 @@ export function useAppData() {
       setEditing(false)
       setEditingId(null)
       setShowModal(false)
-      await initApp()
+      await refreshAppDataPreservingDate(dateToKeep)
       return
     }
 
@@ -1209,8 +1277,10 @@ export function useAppData() {
     setEditing(false)
     setEditingId(null)
 
-    await initApp()
+    await refreshAppDataPreservingDate(dateToKeep)
   }
+
+
 
   const formatDate = (v: string) => {
     if (!isYmd(v)) return v

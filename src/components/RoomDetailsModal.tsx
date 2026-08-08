@@ -1,4 +1,10 @@
-import type { Room, Reservation } from "../hooks/useAppData"
+import {
+  getEffectiveWorkingHours,
+  type Room,
+  type Reservation,
+  type OfficeSettings,
+  type OfficeCalendarDay,
+} from "../hooks/useAppData"
 
 type Props = {
   room: Room
@@ -9,6 +15,9 @@ type Props = {
   onClose: () => void
   onCreate: () => void
   myReservationIds?: Set<number>
+  officeSettings: OfficeSettings | null
+  officeCalendar: OfficeCalendarDay[]
+  nowUtcMs: number
 }
 
 function toYmd(date: Date, zone: string) {
@@ -73,6 +82,9 @@ export default function RoomDetailsModal({
   onClose,
   onCreate,
   myReservationIds,
+  officeSettings,
+  officeCalendar,
+  nowUtcMs,
 }: Props) {
   const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -81,14 +93,19 @@ export default function RoomDetailsModal({
       ? "Europe/Kyiv"
       : localZone
 
-  const dateOf = (v: string) => toYmd(parseUtc(v), zone)
+  const officeDate =
+    timeMode === "kyiv"
+      ? selectedDate
+      : toYmd(toUtcFromDisplay(selectedDate, "12:00", localZone), "Europe/Kyiv")
+
+  const dateOfInOfficeZone = (v: string) => toYmd(parseUtc(v), "Europe/Kyiv")
 
   const list = reservations
     .filter(
       (r) =>
         r.room_id === room.id &&
         r.status !== "cancelled" &&
-        dateOf(r.start_at) === selectedDate
+        dateOfInOfficeZone(r.start_at) === officeDate
     )
     .sort(
       (a, b) =>
@@ -125,13 +142,26 @@ export default function RoomDetailsModal({
   const viewingLabel =
     `${selectedDateLabel}, ${timeMode === "kyiv" ? "Kyiv time" : "Local time"}`
 
-  const todayInKyiv = toYmd(new Date(), "Europe/Kyiv")
-  const officeDate =
-    timeMode === "kyiv"
-      ? selectedDate
-      : toYmd(toUtcFromDisplay(selectedDate, "12:00", localZone), "Europe/Kyiv")
+  const todayInKyiv = toYmd(new Date(nowUtcMs), "Europe/Kyiv")
 
-  const isPastOfficeDate = officeDate < todayInKyiv
+  const dayMeta = getEffectiveWorkingHours(
+    officeDate,
+    officeSettings,
+    officeCalendar
+  )
+
+  const officeEndUtcMs =
+    dayMeta.end
+      ? toUtcFromDisplay(officeDate, dayMeta.end, "Europe/Kyiv").getTime()
+      : null
+
+  const isCreateDisabled =
+    dayMeta.closed ||
+    officeDate < todayInKyiv ||
+    (officeDate === todayInKyiv &&
+      officeEndUtcMs != null &&
+      Number.isFinite(officeEndUtcMs) &&
+      nowUtcMs >= officeEndUtcMs)
 
   const formatSlotTime = (time: string) => {
     if (timeMode === "kyiv") return time
@@ -186,6 +216,20 @@ export default function RoomDetailsModal({
         <div className="room-modal__viewing small">
           {viewingLabel}
         </div>
+
+        {dayMeta.closed && (
+          <div className="small ended" style={{ marginBottom: "12px", fontWeight: 600 }}>
+            {dayMeta.title ? `Closed: ${dayMeta.title}` : "Office is closed on this day."}
+          </div>
+        )}
+
+        {!dayMeta.closed && dayMeta.isOverride && (
+          <div className="small" style={{ marginBottom: "12px", fontWeight: 600 }}>
+            {dayMeta.title
+              ? `Custom working day: ${dayMeta.title}`
+              : `Custom working hours: ${dayMeta.start} - ${dayMeta.end}`}
+          </div>
+        )}
 
         <div className="room-slot-head">
           <span className="room-slot-head__time">
@@ -268,7 +312,7 @@ export default function RoomDetailsModal({
             Close
           </button>
 
-          {!isPastOfficeDate && (
+          {!isCreateDisabled && (
             <button
               className="primary"
               onClick={onCreate}
