@@ -257,6 +257,7 @@ export default function ReservationList({
                 clickable ? "reservation--clickable" : "",
                 isOwn ? "reservation--own" : "",
                 isCancelled ? "reservation--cancelled" : "",
+                isActive ? "reservation--active-now" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -268,12 +269,13 @@ export default function ReservationList({
                 className={[
                   "reservation__title",
                   isOwn ? "reservation__title--own" : "",
+                  isActive ? "reservation__title--active-now" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 title={r.title || "Untitled reservation"}
               >
-                {safeTitle}
+                {isActive ? `Now · ${safeTitle}` : safeTitle}
               </div>
 
               <div
@@ -288,6 +290,7 @@ export default function ReservationList({
                   "reservation__details",
                   "small",
                   isOwn ? "reservation__details--own" : "",
+                  isActive ? "reservation__details--active-now" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}

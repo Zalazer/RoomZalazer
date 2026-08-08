@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Reservation } from "../hooks/useAppData"
 
 type Props = {
@@ -24,6 +24,55 @@ export default function ReminderPopup({
   onClose,
 }: Props) {
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const lastTickSecondRef = useRef<number | null>(null)
+
+  const ensureAudioContext = () => {
+    if (typeof window === "undefined") return null
+
+    const AnyWindow = window as typeof window & {
+      webkitAudioContext?: typeof AudioContext
+    }
+
+    const AudioContextCtor =
+      window.AudioContext || AnyWindow.webkitAudioContext
+
+    if (!AudioContextCtor) return null
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextCtor()
+    }
+
+    const ctx = audioContextRef.current
+
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {})
+    }
+
+    return ctx
+  }
+
+  const playSoftTick = () => {
+    const ctx = ensureAudioContext()
+    if (!ctx) return
+
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(432, now)
+
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.028, now + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12)
+
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+
+    osc.start(now)
+    osc.stop(now + 0.13)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -43,9 +92,30 @@ export default function ReminderPopup({
   }, [open, endsAtMs, nowMs])
 
   useEffect(() => {
-    if (!open) return
-    if (secondsLeft <= 0) onClose()
+    if (!open) {
+      lastTickSecondRef.current = null
+      return
+    }
+
+    if (secondsLeft <= 0) {
+      lastTickSecondRef.current = null
+      onClose()
+      return
+    }
+
+    if (lastTickSecondRef.current !== secondsLeft) {
+      lastTickSecondRef.current = secondsLeft
+      playSoftTick()
+    }
   }, [open, secondsLeft, onClose])
+
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {})
+      }
+    }
+  }, [])
 
   if (!open || !reservation || !type) return null
 
@@ -58,6 +128,8 @@ export default function ReminderPopup({
     type === "before_start"
       ? "Time remaining until the meeting starts."
       : "Time remaining until the meeting ends."
+
+  const urgent = secondsLeft <= 60
 
   return (
     <div
@@ -82,6 +154,12 @@ export default function ReminderPopup({
           padding: 20,
           borderRadius: 18,
           textAlign: "center",
+          border: urgent
+            ? "1px solid rgba(249, 115, 22, 0.55)"
+            : "1px solid rgba(255,255,255,0.10)",
+          boxShadow: urgent
+            ? "0 0 0 4px rgba(249, 115, 22, 0.10)"
+            : undefined,
         }}
       >
         <div className="section-title">{heading}</div>
@@ -105,6 +183,7 @@ export default function ReminderPopup({
             fontWeight: 800,
             lineHeight: 1,
             letterSpacing: "0.02em",
+            color: urgent ? "#f97316" : undefined,
           }}
         >
           {secondsLeft}
@@ -116,9 +195,20 @@ export default function ReminderPopup({
             fontSize: 20,
             fontWeight: 600,
             opacity: 0.9,
+            color: urgent ? "#fdba74" : undefined,
           }}
         >
           {formatClock(secondsLeft)}
+        </div>
+
+        <div
+          className="small"
+          style={{
+            marginTop: 12,
+            opacity: 0.75,
+          }}
+        >
+          A soft tick plays every second until this reminder is dismissed.
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 22 }}>

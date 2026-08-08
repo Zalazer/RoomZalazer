@@ -256,10 +256,16 @@ export default function RoomDetailsModal({
             })
 
             const isOwn = isOwnReservation(item)
+            const isActiveNow =
+              !!item &&
+              nowUtcMs >= parseUtc(item.start_at).getTime() &&
+              nowUtcMs < parseUtc(item.end_at).getTime()
 
             const slotClass = item
               ? isOwn
-                ? "room-slot--own"
+                ? isActiveNow
+                  ? "room-slot--own-active"
+                  : "room-slot--own"
                 : "room-slot--other"
               : "room-slot--free"
 
@@ -292,12 +298,13 @@ export default function RoomDetailsModal({
                   className={[
                     "room-slot__label",
                     isOwn ? "room-slot__label--own" : "",
+                    isOwn && isActiveNow ? "room-slot__label--own-active" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   title={fullLabel}
                 >
-                  {label}
+                  {isOwn && isActiveNow ? `Now — ${label}` : label}
                 </span>
               </div>
             )

@@ -544,9 +544,8 @@ export function useAppData() {
     [timeMode, serverNow, serverReceivedAt]
   )
 
-  const nowUtcMs = useMemo(
-    () => getCurrentUtc(serverNow, serverReceivedAt).getTime(),
-    [serverNow, serverReceivedAt]
+  const [nowUtcMs, setNowUtcMs] = useState(() =>
+    getCurrentUtc(serverNow, serverReceivedAt).getTime()
   )
 
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
@@ -626,6 +625,7 @@ export function useAppData() {
 
       setTime((v) => (v === kyivText ? v : kyivText))
       setLocalTime((v) => (v === localText ? v : localText))
+      setNowUtcMs(now.getTime())
     }
 
     update()
@@ -1457,6 +1457,7 @@ export function useAppData() {
     serverNow,
     serverReceivedAt,
     nowUtcMs,
+    setNowUtcMs,
 
     selectedDate,
     setSelectedDate,

@@ -298,7 +298,7 @@ export default function RoomCard({
 
   const statusClass =
     active
-      ? "reserved"
+      ? "active-now"
       : dayMeta.closed || isBookingClosedForToday || isEndedDay
         ? "ended"
         : "available"
@@ -316,7 +316,7 @@ export default function RoomCard({
   return (
     <>
       <div
-        className="room-card"
+        className={`room-card ${active ? "room-card--active-now" : ""}`}
         onClick={onClick}
       >
         <div className="room-head">
@@ -373,7 +373,7 @@ export default function RoomCard({
           className={`small ${statusClass}`}
           style={{ fontWeight: 600 }}
         >
-          {statusText}
+          {active ? `Now · ${statusText}` : statusText}
         </div>
       </div>
 

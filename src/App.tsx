@@ -1,5 +1,5 @@
 import "./App.css"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import HeaderCard from "./components/HeaderCard"
 import CalendarHeader from "./components/CalendarHeader"
 import WeekSelector from "./components/WeekSelector"
@@ -96,8 +96,8 @@ const toUtcFromZoneSafe = (date: string, time: string, zone: string) => {
     }).format(utcGuess)
 
     const match = rendered.match(
-      /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
-    )
+  /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
+)
 
     if (!match) return utcGuess
 
@@ -246,6 +246,65 @@ export default function App() {
     a.officeSettings,
     a.officeCalendar
   )
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!isYmd(officeDate)) return
+    if (dayMeta.closed) return
+    if (!isHm(dayMeta.start || "") || !isHm(dayMeta.end || "")) return
+
+    const slotMinutesRaw = Number(a.officeSettings?.slot_minutes ?? 30)
+    const slotMinutes = Number.isFinite(slotMinutesRaw) && slotMinutesRaw > 0
+      ? slotMinutesRaw
+      : 30
+
+    const startUtc = toUtcFromZoneSafe(officeDate, dayMeta.start!, "Europe/Kyiv")
+    const endUtc = toUtcFromZoneSafe(officeDate, dayMeta.end!, "Europe/Kyiv")
+
+    const startMs = startUtc.getTime()
+    const endMs = endUtc.getTime()
+
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+      return
+    }
+
+    const slotStepMs = slotMinutes * 60 * 1000
+    const nowMs = Date.now()
+
+    let nextSlotMs: number | null = null
+
+    if (nowMs < startMs) {
+      nextSlotMs = startMs
+    } else {
+      const elapsedMs = nowMs - startMs
+      const slotsPassed = Math.floor(elapsedMs / slotStepMs)
+      const candidate = startMs + (slotsPassed + 1) * slotStepMs
+
+      if (candidate <= endMs) {
+        nextSlotMs = candidate
+      }
+    }
+
+    if (nextSlotMs == null) return
+
+    const delayMs = Math.max(0, nextSlotMs - nowMs + 1000)
+
+    const timerId = window.setTimeout(() => {
+      if (typeof a.setNowUtcMs === "function") {
+        a.setNowUtcMs(Date.now())
+      }
+    }, delayMs)
+
+    return () => window.clearTimeout(timerId)
+  }, [
+    officeDate,
+    dayMeta.closed,
+    dayMeta.start,
+    dayMeta.end,
+    a.officeSettings?.slot_minutes,
+    a.setNowUtcMs,
+    safeNowUtcMs,
+  ])
 
   const officeEndUtcMs =
     dayMeta.end && isYmd(officeDate) && isHm(dayMeta.end)
