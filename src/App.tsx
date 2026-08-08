@@ -9,6 +9,7 @@ import ReservationList from "./components/ReservationList"
 import ReservationModal from "./components/ReservationModal"
 import ProfileModal from "./components/ProfileModal"
 import { useAppData, getEffectiveWorkingHours } from "./hooks/useAppData"
+import useReservationAlerts from "./hooks/useReservationAlerts"
 
 type RoomSortField = "name" | "floor" | "seats"
 
@@ -142,7 +143,24 @@ export default function App() {
     [a.myReservations]
   )
 
-    const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
+  useReservationAlerts({
+    reservations: a.reservations,
+    myReservationIds,
+    nowUtcMs: safeNowUtcMs,
+    officeSettings: a.officeSettings,
+    enabled: a.status !== "booting" && a.status !== "guest" && a.status !== "error",
+    onNotify: ({ type, reservation, minutesLeft }) => {
+      const label = reservation.title || "Untitled reservation"
+
+      if (type === "before_start") {
+        console.log(`Reminder: "${label}" starts in ${minutesLeft} min`)
+      } else {
+        console.log(`Reminder: "${label}" ends in ${minutesLeft} min`)
+      }
+    },
+  })
+
+  const officeDate = getOfficeDateForSelectedDate(a.selectedDate, a.timeMode)
   const todayInKyiv = formatYmdInZone(new Date(safeNowUtcMs), "Europe/Kyiv")
 
   const dayMeta = getEffectiveWorkingHours(
@@ -395,31 +413,31 @@ export default function App() {
         />
 
         <WeekSelector
-  selectedDate={a.selectedDate}
-  setSelectedDate={a.setSelectedDate}
-  formatDate={a.formatDate}
-  todayDate={a.todayDate}
-  formatWeekdayShort={a.formatWeekdayShort}
-  formatDayNumber={a.formatDayNumber}
-  officeSettings={a.officeSettings}
-  officeCalendar={a.officeCalendar}
-/>
+          selectedDate={a.selectedDate}
+          setSelectedDate={a.setSelectedDate}
+          formatDate={a.formatDate}
+          todayDate={a.todayDate}
+          formatWeekdayShort={a.formatWeekdayShort}
+          formatDayNumber={a.formatDayNumber}
+          officeSettings={a.officeSettings}
+          officeCalendar={a.officeCalendar}
+        />
 
         {sortedRooms.map((room) => (
-  <RoomCard
-    key={room.id}
-    room={room}
-    reservations={a.reservations}
-    selectedDate={a.selectedDate}
-    timeMode={a.timeMode}
-    times={a.TIMES}
-    officeSettings={a.officeSettings}
-    officeCalendar={a.officeCalendar}
-    nowUtcMs={safeNowUtcMs}
-    onClick={() => a.setSelectedRoom(room)}
-    myReservationIds={myReservationIds}
-  />
-))}
+          <RoomCard
+            key={room.id}
+            room={room}
+            reservations={a.reservations}
+            selectedDate={a.selectedDate}
+            timeMode={a.timeMode}
+            times={a.TIMES}
+            officeSettings={a.officeSettings}
+            officeCalendar={a.officeCalendar}
+            nowUtcMs={safeNowUtcMs}
+            onClick={() => a.setSelectedRoom(room)}
+            myReservationIds={myReservationIds}
+          />
+        ))}
 
         <div className="footer">RoomZalazer • Google Calendar Style</div>
       </div>
@@ -476,7 +494,7 @@ export default function App() {
         onClose={() => a.setShowProfileModal(false)}
       />
 
-            {selectedRoom && (
+      {selectedRoom && (
         <RoomDetailsModal
           room={selectedRoom}
           reservations={a.reservations}

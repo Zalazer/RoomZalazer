@@ -183,6 +183,11 @@ export default function RoomCard({
 
   const todayInKyiv = toYmd(new Date(nowUtcMs), "Europe/Kyiv")
 
+  const officeStartUtcMs =
+    dayMeta.start
+      ? toUtcFromZone(officeDate, dayMeta.start, "Europe/Kyiv").getTime()
+      : null
+
   const officeEndUtcMs =
     dayMeta.end
       ? toUtcFromZone(officeDate, dayMeta.end, "Europe/Kyiv").getTime()
@@ -224,6 +229,42 @@ export default function RoomCard({
     return startMs > nowUtcMs
   })
 
+  let firstFreeAfterBusyStartMs: number | null = null
+
+  if (
+    !dayMeta.closed &&
+    officeStartUtcMs != null &&
+    officeEndUtcMs != null &&
+    officeStartUtcMs < officeEndUtcMs &&
+    officeDate >= todayInKyiv
+  ) {
+    const firstCovering = roomReservations.find((reservation) => {
+      const startMs = parseUtc(reservation.start_at).getTime()
+      const endMs = parseUtc(reservation.end_at).getTime()
+      return officeStartUtcMs >= startMs && officeStartUtcMs < endMs
+    })
+
+    if (firstCovering) {
+      let cursorMs = parseUtc(firstCovering.end_at).getTime()
+
+      for (const reservation of roomReservations) {
+        const startMs = parseUtc(reservation.start_at).getTime()
+        const endMs = parseUtc(reservation.end_at).getTime()
+
+        if (endMs <= officeStartUtcMs) continue
+        if (startMs > cursorMs) continue
+
+        if (startMs <= cursorMs) {
+          cursorMs = Math.max(cursorMs, endMs)
+        }
+      }
+
+      if (cursorMs < officeEndUtcMs) {
+        firstFreeAfterBusyStartMs = cursorMs
+      }
+    }
+  }
+
   const isBookingClosedForToday =
     !dayMeta.closed &&
     !active &&
@@ -247,11 +288,13 @@ export default function RoomCard({
         ? "Booking closed for today"
         : isEndedDay
           ? "This working day has ended."
-          : nextUpcoming
-            ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
-            : dayMeta.end
-              ? `Free till ${formatOfficeEnd(officeDate, dayMeta.end)}`
-              : "Available"
+          : firstFreeAfterBusyStartMs != null
+            ? `Free from ${formatStatusTime(new Date(firstFreeAfterBusyStartMs))}`
+            : nextUpcoming
+              ? `Free till ${formatStatusTime(nextUpcoming.start_at)}`
+              : dayMeta.end
+                ? `Free till ${formatOfficeEnd(officeDate, dayMeta.end)}`
+                : "Available"
 
   const statusClass =
     active
@@ -293,16 +336,16 @@ export default function RoomCard({
             </div>
           </div>
 
-<button
-  type="button"
-  className="secondary header-btn"
-  onClick={(e) => {
-    e.stopPropagation()
-    setShowWeekGrid(true)
-  }}
->
-  Week grid
-</button>
+          <button
+            type="button"
+            className="secondary header-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowWeekGrid(true)
+            }}
+          >
+            Week grid
+          </button>
         </div>
 
         <Timeline

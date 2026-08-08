@@ -152,19 +152,58 @@ export default function ReservationList({
     return parts.join(" · ")
   }
 
+  const getStatusRank = (r: Reservation) => {
+    const startDate = safeUtc(r.start_at)
+    const endDate = safeUtc(r.end_at)
+    const isCancelled = r.status === "cancelled"
+    const isActive =
+      !isCancelled && !!startDate && !!endDate &&
+      startDate.getTime() <= nowUtcMs && endDate.getTime() > nowUtcMs
+    const isFuture =
+      !isCancelled && !!startDate && startDate.getTime() > nowUtcMs
+    const isFinished =
+      !isCancelled && !!endDate && endDate.getTime() <= nowUtcMs
+
+    if (isActive) return 0
+    if (isFuture) return 1
+    if (isFinished) return 2
+    return 3
+  }
+
+  const getStartMs = (r: Reservation) =>
+    safeUtc(r.start_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
+
+  const getEndMs = (r: Reservation) =>
+    safeUtc(r.end_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
+
   const list = [...reservations].sort((a, b) => {
+    const rankA = getStatusRank(a)
+    const rankB = getStatusRank(b)
+
+    if (rankA !== rankB) return rankA - rankB
+
+    if (rankA === 0) {
+      const aEnd = getEndMs(a)
+      const bEnd = getEndMs(b)
+      if (aEnd !== bEnd) return aEnd - bEnd
+    }
+
+    if (rankA === 1) {
+      const aStart = getStartMs(a)
+      const bStart = getStartMs(b)
+      if (aStart !== bStart) return aStart - bStart
+    }
+
+    if (rankA === 2 || rankA === 3) {
+      const aStart = getStartMs(a)
+      const bStart = getStartMs(b)
+      if (aStart !== bStart) return bStart - aStart
+    }
+
     const byRoom = compareRoom(a, b)
     if (byRoom !== 0) return byRoom
 
-    const ac = a.status === "cancelled"
-    const bc = b.status === "cancelled"
-
-    if (ac !== bc) return ac ? 1 : -1
-
-    const at = safeUtc(a.start_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
-    const bt = safeUtc(b.start_at)?.getTime() ?? Number.MAX_SAFE_INTEGER
-
-    return at - bt
+    return Number(a.id ?? 0) - Number(b.id ?? 0)
   })
 
   return (
@@ -182,9 +221,13 @@ export default function ReservationList({
         <div className="small">No reservations.</div>
       ) : (
         list.map((r) => {
+          const startDate = safeUtc(r.start_at)
           const endDate = safeUtc(r.end_at)
           const isCancelled = r.status === "cancelled"
-          const isFinished = !isCancelled && !!endDate && endDate.getTime() < nowUtcMs
+          const isFinished = !isCancelled && !!endDate && endDate.getTime() <= nowUtcMs
+          const isActive =
+            !isCancelled && !!startDate && !!endDate &&
+            startDate.getTime() <= nowUtcMs && endDate.getTime() > nowUtcMs
           const isOwn = !isCancelled && !isFinished
           const clickable = !!onOpenPast
 
@@ -192,7 +235,9 @@ export default function ReservationList({
             ? "cancelled"
             : isFinished
               ? "finished"
-              : "reserved"
+              : isActive
+                ? "in progress"
+                : "reserved"
 
           const mins = duration(r.start_at, r.end_at)
           const safeTitle = cutSingleLine(r.title || "Untitled reservation", 84)
